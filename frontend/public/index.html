@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NeuGenes GridFS Upload</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 40px; }
+    #dropZone {
+      border: 3px dashed #aaa;
+      padding: 50px;
+      margin: 30px auto;
+      width: 300px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>NeuGenes PNG Upload (GridFS)</h1>
+  <div id="dropZone">Drop PNG here</div>
+  <p id="status"></p>
+
+  <script>
+    const dropZone = document.getElementById('dropZone');
+    const status = document.getElementById('status');
+
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = 'green'; });
+    dropZone.addEventListener('dragleave', e => { e.preventDefault(); dropZone.style.borderColor = '#aaa'; });
+
+    dropZone.addEventListener('drop', async e => {
+      e.preventDefault();
+      dropZone.style.borderColor = '#aaa';
+
+      const file = e.dataTransfer.files[0];
+      if (!file || file.type !== 'image/png') {
+        alert('Please drop a PNG file!');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+      status.textContent = 'Uploading to GridFS...';
+
+      const res = await fetch('/process_single_image', { method: 'POST', body: formData });
+      const data = await res.json();
+      status.textContent = `Processed! Result: ${data.result}`;
+      console.log(data);
+    });
+  </script>
+</body>
+</html>

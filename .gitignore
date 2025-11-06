@@ -1,3 +1,12 @@
+
+node_modules/
+.DS_Store
+coverage/
+.en
+server/uploads/
+
+
+
 # Logs
 logs
 *.log
@@ -137,8 +146,3 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
-
-node_modules/
-.DS_Store
-coverage/
-.en
