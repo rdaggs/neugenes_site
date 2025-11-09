@@ -3,7 +3,7 @@ node_modules/
 .DS_Store
 coverage/
 .en
-server/uploads/g
+server/uploads/
 *.nrrd
 *.zip
 
