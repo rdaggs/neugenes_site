@@ -153,3 +153,23 @@ server/uploads/*
 !server/uploads/.gitkeep
 neugenes/uploads/*
 !neugenes/uploads/.gitkeep
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
