@@ -5,6 +5,7 @@ coverage/
 .en
 server/uploads/g
 *.nrrd
+*.zip
 
 
 
