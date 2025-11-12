@@ -132,6 +132,59 @@ app.post('/upload_dataset', upload.array('files', IMG_UPLOAD_CEILING), async (re
     }
 })
 
+app.post('/accept_dataset_parameters', express.json(), (req, res) => {
+
+    try {
+    const {
+      base_dir,
+      structure_acronymns,
+      dot_count,
+      expression_intensity,
+      threshold_scale,
+      layer_in_tiff,
+      patch_size,
+      ring_width,
+      z_threshold
+    } = req.body
+
+    // quick validation
+    if (!base_dir || !structure_acronymns) {
+      return res.status(400).json({ success: false, error: 'Missing base_dir or structure_acronymns' })
+    }
+
+    // store parameters
+    datasetParams = {
+      base_dir,
+      structure_acronymns,
+      dot_count: Boolean(dot_count),
+      expression_intensity: Boolean(expression_intensity),
+      threshold_scale: parseFloat(threshold_scale),
+      layer_in_tiff: parseInt(layer_in_tiff),
+      patch_size: parseInt(patch_size),
+      ring_width: parseInt(ring_width),
+      z_threshold: parseFloat(z_threshold)
+    }
+
+    console.log('received dataset parameters:', datasetParams)
+
+    return res.json({ success: true, params: datasetParams })
+
+
+  } 
+  catch (err) {
+    console.error('Error parsing dataset parameters:', err)
+    res.status(500).json({ success: false, error: 'Failed to save parameters' })
+  }
+    
+})
+
+app.post('/process_dataset', (req, res) => {
+
+    // bring in parameters from 
+    // base_dir,structure_acronymns, dot_count,expression_intensity,threshold_scale,layer_in_tiff=1,patch_size=7,ring_width=3, z_threshold=1.2):
+    
+})
+
 //===========================HELPER FUNCTIONS=========================//
 async function uploadImageGridFS(file){
     console.log(`uploading ${file.path} to gridfs`)

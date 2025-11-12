@@ -200,6 +200,57 @@
     <p id="statusMultiple" class="status"></p>
   </div>
 
+  <!-- Parameter Selection -->
+  <div class="upload-section">
+    <h2>Dataset Parameters</h2>
+    <div class="params-grid">
+      <div class="param-item">
+        <label for="baseDir">Base Directory</label>
+        <input type="text" id="baseDir" placeholder="/path/to/dataset">
+      </div>
+      <div class="param-item">
+        <label for="structureAcronyms">Structure Acronyms</label>
+        <input type="text" id="structureAcronyms" placeholder="FULL_BRAIN">
+      </div>
+      <div class="param-item">
+        <label for="dotCount">Dot Count</label>
+        <input type="checkbox" id="dotCount" checked>
+      </div>
+      <div class="param-item">
+        <label for="expressionIntensity">Expression Intensity</label>
+        <input type="checkbox" id="expressionIntensity">
+      </div>
+      <div class="param-item">
+        <label for="thresholdScale">Threshold Scale</label>
+        <input type="number" step="0.1" id="thresholdScale" value="1.0">
+      </div>
+      <div class="param-item">
+        <label for="layerInTiff">Layer in TIFF</label>
+        <input type="number" id="layerInTiff" value="1">
+      </div>
+      <div class="param-item">
+        <label for="patchSize">Patch Size</label>
+        <input type="number" id="patchSize" value="7">
+      </div>
+      <div class="param-item">
+        <label for="ringWidth">Ring Width</label>
+        <input type="number" id="ringWidth" value="3">
+      </div>
+      <div class="param-item">
+        <label for="zThreshold">Z Threshold</label>
+        <input type="number" step="0.1" id="zThreshold" value="1.2">
+      </div>
+    </div>
+    <button id="saveParamsBtn">Save Parameters</button>
+    <p id="paramsStatus" class="status"></p>
+  </div>
+
+    <!-- Processing -->
+  <div class="upload-section">
+    <h2>Run Dataset Processing</h2>
+    <button id="processDatasetBtn">Process Dataset</button>
+    <p id="processStatus" class="status"></p>
+  </div>
   <script>
   
 
@@ -237,22 +288,14 @@
 
     
     // Drag and drop events
-    dropZoneMultiple.addEventListener('dragover', (e) => {
-      e.preventDefault()
-      dropZoneMultiple.classList.add('drag-over')
-    })
+    dropZoneMultiple.addEventListener('dragover', (e) => {e.preventDefault(), dropZoneMultiple.classList.add('drag-over')})
     
-    dropZoneMultiple.addEventListener('dragleave', (e) => {
-      e.preventDefault()
-      dropZoneMultiple.classList.remove('drag-over')
-    })
+    dropZoneMultiple.addEventListener('dragleave', (e) => {e.preventDefault(), dropZoneMultiple.classList.remove('drag-over')})
     
     // when drop into dropZoneMultiple, run this event listener
     dropZoneMultiple.addEventListener('drop', (e) => {
       e.preventDefault()
       dropZoneMultiple.classList.remove('drag-over')
-      
-      
       
       // filtering logic, accept files from e.dataTransfer.files
       const files = filterFileList(e.dataTransfer.files)
@@ -262,8 +305,6 @@
         showStatus(statusMultiple, 'Please drop PNG files only!', 'error')
         return
       }
-
-
       // IS THIS WHERE WE CAN BEGIN THE DATAFRAME OBJECT 
       //                          e.dataTransfer.files                          //
       // {                                                                      //
@@ -278,7 +319,6 @@
       addFiles(files)
     })
 
-
     // filter files upon acceptance
     function filterFileList(files){
 
@@ -288,7 +328,6 @@
       const accepted_formats = [{ type: 'image/png', ext: '.png', label: 'PNG' },
                                 { type: 'image/jpeg', ext: '.jpg', label: 'JPEG' },
                                 { type: 'image/tiff', ext: '.tiff', label: 'TIFF' }]
-
 
       for(const file of files){
 
@@ -439,9 +478,51 @@
         uploadBtn.disabled = false
       }
     })
+
+    //================== PARAMETER ACCEPTANCE ==================//
+    const saveParamsButton = document.getElementById('saveParamsBtn')
+    const paramsStatus = document.getElementById('paramsStatus')
+
+    saveParamsButton.addEventListener('click', async () =>{
+      const payload = {
+        base_dir: document.getElementById('baseDir').value,
+        structure_acronymns: document.getElementById('structureAcronyms').value,
+        dot_count: document.getElementById('dotCount').checked,
+        expression_intensity: document.getElementById('expressionIntensity').checked,
+        threshold_scale: parseFloat(document.getElementById('thresholdScale').value),
+        layer_in_tiff: parseInt(document.getElementById('layerInTiff').value),
+        patch_size: parseInt(document.getElementById('patchSize').value),
+        ring_width: parseInt(document.getElementById('ringWidth').value),
+        z_threshold: parseFloat(document.getElementById('zThreshold').value)
+      }
+      // send parameters in JSON body to backend
+      const res = await fetch('/accept_dataset_parameters', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      // dispkay if parameter saving successful? 
+      const data = await res.json()
+      if (data.success) showStatus(paramsStatus, 'Parameters saved successfully.', 'success')
+      else showStatus(paramsStatus, `Error saving parameters: ${data.error}`, 'error')
+    })
     
     
-    // ==================== HELPER FUNCTIONS ====================
+    //==================== PROCESS FUNCTION ====================//
+    processDatasetBtn.addEventListener('click', async ()=>{
+      showStatus(processStatus, 'running algorithm...', 'info')
+      const res = await fetch('/process_dataset', { method: 'POST' })
+      const data = await res.json()
+      
+      // status message
+      if (data.success) showStatus(processStatus, `Processing complete: ${data.message}`, 'success')
+      else showStatus(processStatus, `Error: ${data.error}`, 'error')
+
+    })
+
+
+    //==================== HELPER FUNCTIONS ====================//    
     function showStatus(element, message, type) {
       element.textContent = message
       element.className = 'status'

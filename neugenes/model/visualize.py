@@ -6,7 +6,7 @@ from bokeh.io.export import export_png
 import os
 from model.config import *
 def plot_expression_levels_scaled(filepath1, structures,names,title,output_filepath):
-    print("inside here")
+
     # Load the datasets
     data1 = pd.read_csv(filepath1)
 
