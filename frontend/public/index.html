@@ -1,16 +1,16 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>NeuGenes GridFS Upload</title>
   <style>
-    body { font-family: sans-serif; text-align: center; padding: 40px; }
+    body { font-family: sans-serif text-align: center padding: 40px }
     #dropZone {
-      border: 3px dashed #aaa;
-      padding: 50px;
-      margin: 30px auto;
-      width: 300px;
-      cursor: pointer;
+      border: 3px dashed #aaa
+      padding: 50px
+      margin: 30px auto
+      width: 300px
+      cursor: pointer
     }
   </style>
 </head>
@@ -20,31 +20,433 @@
   <p id="status"></p>
 
   <script>
-    const dropZone = document.getElementById('dropZone');
-    const status = document.getElementById('status');
+    const dropZone = document.getElementById('dropZone')
+    const status = document.getElementById('status')
 
-    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = 'green'; });
-    dropZone.addEventListener('dragleave', e => { e.preventDefault(); dropZone.style.borderColor = '#aaa'; });
+    dropZone.addEventListener('dragover', e => { e.preventDefault() dropZone.style.borderColor = 'green' })
+    dropZone.addEventListener('dragleave', e => { e.preventDefault() dropZone.style.borderColor = '#aaa' })
 
     dropZone.addEventListener('drop', async e => {
-      e.preventDefault();
-      dropZone.style.borderColor = '#aaa';
+      e.preventDefault()
+      dropZone.style.borderColor = '#aaa'
 
-      const file = e.dataTransfer.files[0];
+      const file = e.dataTransfer.files[0]
       if (!file || file.type !== 'image/png') {
-        alert('Please drop a PNG file!');
-        return;
+        alert('Please drop a PNG file!')
+        return
       }
 
-      const formData = new FormData();
-      formData.append('file', file);
-      status.textContent = 'Uploading to GridFS...';
+      const formData = new FormData()
+      formData.append('file', file)
+      status.textContent = 'Uploading to GridFS...'
 
-      const res = await fetch('/process_single_image', { method: 'POST', body: formData });
-      const data = await res.json();
-      status.textContent = `Processed! Result: ${data.result}`;
-      console.log(data);
-    });
+      const res = await fetch('/process_single_image', { method: 'POST', body: formData })
+      const data = await res.json()
+      status.textContent = `Processed! Result: ${data.result}`
+      console.log(data)
+    })
+  </script>
+</body>
+</html> -->
+
+<!-- LOAD ENVIORNMENT VARIABLES-->
+<script>
+  let MAX_SIZE_MB = 0
+  let MAX_FILES = 0
+
+  async function loadConfig() {
+    const res = await fetch('/config')
+    const data = await res.json()
+    MAX_SIZE_MB = data.MAX_SIZE_MB
+    MAX_FILES = data.MAX_FILES
+
+    console.log(`Loaded config: ${MAX_SIZE_MB} MB max size, ${MAX_FILES} files allowed`)
+  }
+
+  // Load config before attaching listeners
+  loadConfig()
+</script>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NeuGenes GridFS Upload</title>
+  <style>
+    body { 
+      font-family: sans-serif; 
+      text-align: center; 
+      padding: 40px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    .upload-section {
+      margin: 40px 0;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    
+    #dropZoneSingle, #dropZoneMultiple {
+      border: 3px dashed #aaa;
+      padding: 50px;
+      margin: 20px auto;
+      width: 300px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    #dropZoneSingle:hover, #dropZoneMultiple:hover {
+      border-color: #666;
+      background-color: #f9f9f9;
+    }
+    
+    .drag-over {
+      border-color: green !important;
+      background-color: #e8f5e9 !important;
+    }
+    
+    #fileList {
+      text-align: left;
+      margin: 20px auto;
+      max-width: 400px;
+    }
+    
+    .file-item {
+      padding: 8px;
+      background: #f5f5f5;
+      margin: 5px 0;
+      border-radius: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .remove-btn {
+      background: #ff4444;
+      color: white;
+      border: none;
+      padding: 4px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    .remove-btn:hover {
+      background: #cc0000;
+    }
+    
+    #uploadBtn {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      font-size: 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    
+    #uploadBtn:hover {
+      background: #45a049;
+    }
+    
+    #uploadBtn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    
+    .status {
+      margin-top: 20px;
+      padding: 10px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+    }
+    
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    
+    .status.info {
+      background: #d1ecf1;
+      color: #0c5460;
+    }
+  </style>
+</head>
+<body>
+  <h1>NeuGenes Image Upload</h1>
+  
+  <!-- Single Image Upload -->
+  <div class="upload-section">
+    <h2>Single Image Processing</h2>
+    <div id="dropZoneSingle">Drop PNG here or click to select</div>
+    <input type="file" id="fileInputSingle" accept="image/png" style="display: none">
+    <p id="statusSingle" class="status"></p>
+  </div>
+  
+  <!-- Multiple Image Upload (Dataset) -->
+  <div class="upload-section">
+    <h2>Dataset Processing (up to 25 images)</h2>
+    <div id="dropZoneMultiple">Drop PNG files here or click to select</div>
+    <input type="file" id="fileInputMultiple" accept="image/png" multiple style="display: none">
+    <div id="fileList"></div>
+    <button id="uploadBtn" style="display: none">Upload All Images</button>
+    <p id="statusMultiple" class="status"></p>
+  </div>
+
+  <script>
+  
+
+
+
+
+
+
+
+
+
+
+
+    //==================== MULTIPLE IMAGE UPLOAD ====================//
+    const dropZoneMultiple = document.getElementById('dropZoneMultiple')
+    const fileInputMultiple = document.getElementById('fileInputMultiple')
+    const fileList = document.getElementById('fileList')
+    const uploadBtn = document.getElementById('uploadBtn')
+    const statusMultiple = document.getElementById('statusMultiple')
+
+    let selectedFiles = []
+    const IMG_UPLOAD_CEILING = 25
+
+    // opens users file system to select files
+    dropZoneMultiple.addEventListener('click', () => fileInputMultiple.click())
+
+    // when user clicks drop zone and picks geq 1 files
+    fileInputMultiple.addEventListener('change', (e) => {
+      
+      // call addFiles which will parse through selections and appends to selectedFiles
+      // files is a array of objects repesenting files
+      addFiles(Array.from(e.target.files))
+      fileInputMultiple.value = ''
+    })
+
+    
+    // Drag and drop events
+    dropZoneMultiple.addEventListener('dragover', (e) => {
+      e.preventDefault()
+      dropZoneMultiple.classList.add('drag-over')
+    })
+    
+    dropZoneMultiple.addEventListener('dragleave', (e) => {
+      e.preventDefault()
+      dropZoneMultiple.classList.remove('drag-over')
+    })
+    
+    // when drop into dropZoneMultiple, run this event listener
+    dropZoneMultiple.addEventListener('drop', (e) => {
+      e.preventDefault()
+      dropZoneMultiple.classList.remove('drag-over')
+      
+      
+      
+      // filtering logic, accept files from e.dataTransfer.files
+      const files = filterFileList(e.dataTransfer.files)
+
+        // empty
+      if (files.length === 0) {
+        showStatus(statusMultiple, 'Please drop PNG files only!', 'error')
+        return
+      }
+
+
+      // IS THIS WHERE WE CAN BEGIN THE DATAFRAME OBJECT 
+      //                          e.dataTransfer.files                          //
+      // {                                                                      //
+      //   type: "drop",                                                        //
+      //   dataTransfer: {                                                      //
+      //     files: FileList(3) [                                               //
+      //       File { name: "brain1.png", size: 105000, type: "image/png" },    // 
+      //       File { name: "brain2.jpg", size: 98000, type: "image/jpeg" },    //
+      //       File { name: "notes.txt", size: 500, type: "text/plain" }        //
+
+      // pass valid dropped files to addFiles logic
+      addFiles(files)
+    })
+
+
+    // filter files upon acceptance
+    function filterFileList(files){
+
+      if(!fileList) return []
+      const accepted_list = []
+
+      const accepted_formats = [{ type: 'image/png', ext: '.png', label: 'PNG' },
+                                { type: 'image/jpeg', ext: '.jpg', label: 'JPEG' },
+                                { type: 'image/tiff', ext: '.tiff', label: 'TIFF' }]
+
+
+      for(const file of files){
+
+        // attributes
+        const fileSizeMB = file.size / (1024 * 1024)
+        const fileType = file.type.toLowerCase()
+        const fileName = file.name.toLowerCase()
+
+        // ensure file size doesn't exceed limit
+        if(fileSizeMB > MAX_SIZE_MB){
+          console.warn(`skipping ${file.name} — too large (${fileSizeMB.toFixed(2)} MB > ${MAX_SIZE_MB} MB)`)
+          continue 
+        }
+
+        // allowed format 
+        let isAccepted = false
+        for (const fmt of accepted_formats) {
+          if (fileType === fmt.type || fileName.endsWith(fmt.ext)) {
+            isAccepted = true
+            break
+          }
+        }
+
+        if (!isAccepted) {
+          console.warn(`skipping ${file.name} — unsupported format`)
+          continue
+        }
+        
+        // successfully added
+        accepted_list.push(file)
+      }
+      return accepted_list
+    }
+
+    // add files
+    function addFiles(files) {
+      if (!files || files.length === 0) {
+        showStatus(statusMultiple, 'No files detected.', 'error')
+        return
+      }
+
+      const acceptedFiles = filterFileList(files)
+      const remainingSlots = MAX_FILES - selectedFiles.length
+
+      if (acceptedFiles.length > remainingSlots) {
+        showStatus(
+          statusMultiple,
+          `Only ${remainingSlots} more file(s) can be added (limit: ${MAX_FILES}).`,
+          'error'
+        )
+        return
+      }
+      // add accepted file
+      selectedFiles.push(...acceptedFiles)
+      updateFileList()
+
+      if (acceptedFiles.length === 0) {
+        showStatus(statusMultiple, 'No valid files added (wrong type or too large).', 'error')
+      } 
+      
+      else {
+        showStatus(
+          statusMultiple,
+          `${selectedFiles.length} file(s) selected (added ${acceptedFiles.length}).`,
+          'info'
+        )
+      }
+    }
+    
+    function updateFileList() {
+      if (selectedFiles.length === 0) {
+        fileList.innerHTML = ''
+        uploadBtn.style.display = 'none'
+        return
+      }
+      
+      fileList.innerHTML = '<h3>Selected Files:</h3>'
+      selectedFiles.forEach((file, index) => {
+        const fileItem = document.createElement('div')
+        fileItem.className = 'file-item'
+        fileItem.innerHTML = `
+          <span>${file.name} (${(file.size / 1024).toFixed(2)} KB)</span>
+          <button class="remove-btn" onclick="removeFile(${index})">Remove</button>
+        `
+        fileList.appendChild(fileItem)
+      })
+      
+      uploadBtn.style.display = 'block'
+    }
+    
+    window.removeFile = function(index) {
+      selectedFiles.splice(index, 1)
+      updateFileList()
+      if (selectedFiles.length === 0) {
+        showStatus(statusMultiple, '', '')
+      } else {
+        showStatus(statusMultiple, `${selectedFiles.length} file(s) selected`, 'info')
+      }
+    }
+    
+    // whenever upload button is clicked 
+    uploadBtn.addEventListener('click', async () => {
+      if (selectedFiles.length === 0) return
+
+      const formData = new FormData()
+      
+      
+      selectedFiles.forEach(file => {
+        formData.append('files',file)
+      })
+
+      
+      
+      uploadBtn.disabled = true
+      showStatus(statusMultiple, `uploading ${selectedFiles.length} files to gridfs...`, 'info')
+      
+      try {
+
+        // sends POST request to backend endpoint to upload dataset...req.files...w
+        const res = await fetch('/upload_dataset', {
+          method: 'POST',
+          body: formData
+        })
+        
+        // waits for promise in /upload_dataset to 
+        const data = await res.json()
+        
+        if (data.success) {
+          showStatus(statusMultiple, 
+            `Success! Uploaded ${data.filesUploaded} files to GridFS.`, 
+            'success'
+          )
+          console.log('multiple images upload:', data)
+          
+          // Clear the selected files
+          selectedFiles = []
+          updateFileList()
+        } 
+        else {
+          showStatus(statusMultiple, `Error: ${data.error}`, 'error')
+        }
+      } 
+      catch (error) {
+        showStatus(statusMultiple, `Upload failed: ${error.message}`, 'error')
+        console.error(error)
+      } 
+      finally {
+        uploadBtn.disabled = false
+      }
+    })
+    
+    
+    // ==================== HELPER FUNCTIONS ====================
+    function showStatus(element, message, type) {
+      element.textContent = message
+      element.className = 'status'
+      if (type) element.classList.add(type)
+    }
   </script>
 </body>
 </html>

@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # directories
-root = '/Users/riley/Desktop/updated/neugenes'
+root = '/Users/riley/Desktop/neugenes_site'
 # root = os.getenv('ROOT_PATH')
 # if root is None:
 #     raise ValueError("ROOT_PATH not found in .env file. Please create a .env file with ROOT_PATH set.")
