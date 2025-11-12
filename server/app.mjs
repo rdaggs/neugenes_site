@@ -96,7 +96,7 @@ app.post('/process_single_image', upload.single('file'), async (req, res) => {
 
             py.on('close', (code) => {
                 console.log(`python exited with code: ${code}`) 
-                fs.unlinkSync(tempPath) 
+                //fs.unlinkSync(tempPath) 
                 res.json({ success: true, fileId: uploadStream.id, result: output.trim() }) 
         }) 
     })
@@ -204,7 +204,9 @@ async function uploadImageGridFS(file){
             .on('error', (err) => {console.error(`error uploading ${localPath} to gridfs:`, err),reject(err)})
             .on('finish', () => {
                 console.log(`uploading ${file.path} to gridfs complete`)
+                //===============DELETES DURING RUNTIME================//
                 fs.unlinkSync(localPath)
+                //=====================================================//
                 resolve({fileId: uploadStream.id, originalName: originalName})
             })
     })
