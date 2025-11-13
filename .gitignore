@@ -6,7 +6,7 @@ coverage/
 server/uploads/
 *.nrrd
 *.zip
-
+*.png
 
 
 # Logs
