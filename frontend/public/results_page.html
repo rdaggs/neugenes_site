@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NeuGenes - Results</title>
+  <style>
+    body { 
+      font-family: sans-serif; 
+      padding: 40px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .results-container {
+      margin: 20px 0;
+      text-align: center;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+    
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    
+    .back-button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+    
+    .back-button:hover {
+      background: #45a049;
+    }
+
+    #resultImage {
+      max-width: 100%;
+      height: auto;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <button class="back-button" onclick="window.location.href='/'">← Back to Upload</button>
+  
+  <h1>Dataset Processing Results</h1>
+  
+  <div id="loadingMessage" class="loading">Loading results...</div>
+  <div id="errorMessage" class="error" style="display: none;"></div>
+  
+  <div id="resultsContainer" class="results-container" style="display: none;">
+    <h2>Result Image</h2>
+    <img id="resultImage" src="" alt="Processing result">
+  </div>
+
+  <script>
+    async function loadResults() {
+       
+
+        // set image source to url path
+        document.getElementById('resultImage').src = data.heatMapPath
+    }
+    async function loadResults() {
+      try {
+        console.log('fetching heatmap...')
+        
+        const response = await fetch('/api/result_heatmap')  // Fixed typo
+        console.log('Response status:', response.status)
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        
+        const data = await response.json()
+        console.log('Received data:', data)
+        
+        if (!data.success) {
+          showError(data.error || 'Failed to load results')
+          return
+        }
+        
+        // Hide loading, show image
+        displayImage(data.heatMapPath)
+        
+      } catch (error) {
+        console.error('Error loading results:', error)
+        showError(`Failed to load results: ${error.message}`)
+      }
+    }
+    
+    function displayImage(imagePath) {
+      console.log('Displaying image:', imagePath)
+      document.getElementById('loadingMessage').style.display = 'none'
+      document.getElementById('resultsContainer').style.display = 'block'
+      document.getElementById('resultImage').src = imagePath
+    }
+    
+    function showError(message) {
+      document.getElementById('loadingMessage').style.display = 'none'
+      const errorDiv = document.getElementById('errorMessage')
+      errorDiv.textContent = message
+      errorDiv.style.display = 'block'
+    }
+    
+    // Load results when page loads
+    loadResults()
+  </script>
+</body>
+</html>

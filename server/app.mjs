@@ -26,7 +26,9 @@ const upload = multer({ dest: path.join(__dirname, 'uploads/') })
 
 // directory setup
 const ROOT_DIR = path.join(__dirname,'..')
+const MODEL_PATH = path.join(__dirname, '../neugenes/model')
 const DATASET_DIR = path.join(__dirname, '../neugenes/dataset')
+const DATASET_PROCESSED_DIR = path.join(__dirname, '../neugenes/dataset_processed')
 const IMG_UPLOAD_CEILING =  APP_CONFIG?.MAX_FILES || 25
 const IMG_MAX = APP_CONFIG?.MAX_SIZE_MB || 256
 const PORT = process.env.port || 3000
@@ -35,22 +37,18 @@ const PORT = process.env.port || 3000
 
 
 //=============================MIDDLEWARE=============================//
-function initializeModel(req,res,next){
-
-    console.log('root directory for project:',ROOT_DIR)
-    console.log('data directory for processing:',DATASET_DIR)
-    req.modelPath = path.join(ROOT_DIR,'model')
+app.use((req, res, next) => {
+    req.modelPath = MODEL_PATH
     next()
-}
-
-
-app.use(initializeModel)                                             // initialize global model paramters 
+})
 app.use(express.static(path.join(__dirname, '../frontend/public')))
 
 //==============================ROUTING==============================//
 
 
-app.get('/', (req,res) =>{res.sendFile(path.join(__dirname, '../frontend/public/index.html'))})
+app.get('/', (req,res) =>{
+    res.sendFile(path.join(__dirname, '../frontend/public/upload_page.html'))
+})
 
 // accept + store .png --> save to gridFS --> sample wireframe
 app.post('/process_single_image', upload.single('file'), async (req, res) => {
@@ -186,8 +184,42 @@ app.post('/process_dataset', (req, res) => {
     
 })
 
-app.post('/view_results',(req,res) =>{
-    
+app.get('/results_page', (req,res) => {
+    res.sendFile(path.join(__dirname, '../frontend/public/results_page.html'))
+})
+
+// static file server that maps the URL path to the filesystem path 
+// map URL '/results' to folder '../neugenes/dataset_processed'
+app.use('/results', express.static(DATASET_PROCESSED_DIR))
+
+
+app.get('/api/result_heatmap', (req,res) =>{
+
+    try{
+
+        console.log('API /api/result_heatmap called')
+        const heatMapPath = path.join(DATASET_PROCESSED_DIR,'heatmap.png')
+
+        if(!fs.existsSync(heatMapPath)){
+            return res.status(404).json({
+                success: false, 
+                error: 'heatmap.png image not found. Please process the dataset first.' 
+            })
+        }
+
+        res.json({
+            success: true,
+            heatMapPath: 'results/heatmap.png'
+        })
+    }
+
+    catch(error){
+        console.error('error finding heatmap:', error)
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        })
+    }
 })
 
 //===========================HELPER FUNCTIONS=========================//
@@ -226,4 +258,8 @@ app.get('/config', (req, res) => {
 
 app.listen(PORT, ()=>{
     console.log(`server running on port ${PORT}`)
+    console.log('Initializing application...')
+    console.log('Root directory:', ROOT_DIR)
+    console.log('Dataset directory:', DATASET_DIR)
+    console.log('Model path:', MODEL_PATH)
 })

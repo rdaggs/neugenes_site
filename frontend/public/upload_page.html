@@ -20,7 +20,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>NeuGenes GridFS Upload</title>
+  <title>NeuGenes Platform</title>
   <style>
     body { 
       font-family: sans-serif; 
@@ -200,6 +200,13 @@
     <button id="processDatasetBtn">Process Dataset</button>
     <p id="processStatus" class="status"></p>
   </div>
+
+    <!-- Results -->
+  <div class="view-results">
+    <h2>Results Page</h2>
+    <button id="viewResultsBtn">View Results</button>
+    <p id="processStatus" class="status"></p>
+  </div>
   <script>
   
 
@@ -209,6 +216,7 @@
     const fileList = document.getElementById('fileList')
     const uploadBtn = document.getElementById('uploadBtn')
     const statusMultiple = document.getElementById('statusMultiple')
+    const viewResultsBtn = document.getElementById('viewResultsBtn')
 
     let selectedFiles = []
     const IMG_UPLOAD_CEILING = 25
@@ -471,6 +479,13 @@
         processDatasetBtn.disabled = false
       }
     })
+
+    //====================== RESULTS PAGE ======================//
+    viewResultsBtn.addEventListener('click', () => {
+      window.location.href = '/results_page'
+    })
+
+
     //================ NORMALIZATION PARAMETERS ================//
     //==================== GENERATE HEATMAP ====================//
 
