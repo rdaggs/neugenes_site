@@ -6,7 +6,14 @@ coverage/
 server/uploads/
 *.nrrd
 *.zip
+
+
+neugenes/dataset_processed/
 *.png
+*.tif
+*.tiff
+uploads/
+server/uploads/
 
 
 # Logs
