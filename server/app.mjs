@@ -179,9 +179,14 @@ app.post('/accept_dataset_parameters', express.json(), (req, res) => {
 })
 
 app.post('/process_dataset', (req, res) => {
+    console.log('working')
 
     // bring in parameters from 
     // base_dir,structure_acronymns, dot_count,expression_intensity,threshold_scale,layer_in_tiff=1,patch_size=7,ring_width=3, z_threshold=1.2):
+    
+})
+
+app.post('/view_results',(req,res) =>{
     
 })
 

@@ -1,54 +1,3 @@
-<!-- <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>NeuGenes GridFS Upload</title>
-  <style>
-    body { font-family: sans-serif text-align: center padding: 40px }
-    #dropZone {
-      border: 3px dashed #aaa
-      padding: 50px
-      margin: 30px auto
-      width: 300px
-      cursor: pointer
-    }
-  </style>
-</head>
-<body>
-  <h1>NeuGenes PNG Upload (GridFS)</h1>
-  <div id="dropZone">Drop PNG here</div>
-  <p id="status"></p>
-
-  <script>
-    const dropZone = document.getElementById('dropZone')
-    const status = document.getElementById('status')
-
-    dropZone.addEventListener('dragover', e => { e.preventDefault() dropZone.style.borderColor = 'green' })
-    dropZone.addEventListener('dragleave', e => { e.preventDefault() dropZone.style.borderColor = '#aaa' })
-
-    dropZone.addEventListener('drop', async e => {
-      e.preventDefault()
-      dropZone.style.borderColor = '#aaa'
-
-      const file = e.dataTransfer.files[0]
-      if (!file || file.type !== 'image/png') {
-        alert('Please drop a PNG file!')
-        return
-      }
-
-      const formData = new FormData()
-      formData.append('file', file)
-      status.textContent = 'Uploading to GridFS...'
-
-      const res = await fetch('/process_single_image', { method: 'POST', body: formData })
-      const data = await res.json()
-      status.textContent = `Processed! Result: ${data.result}`
-      console.log(data)
-    })
-  </script>
-</body>
-</html> -->
-
 <!-- LOAD ENVIORNMENT VARIABLES-->
 <script>
   let MAX_SIZE_MB = 0
@@ -254,17 +203,7 @@
   <script>
   
 
-
-
-
-
-
-
-
-
-
-
-    //==================== MULTIPLE IMAGE UPLOAD ====================//
+    //====================== IMAGE UPLOAD ======================//
     const dropZoneMultiple = document.getElementById('dropZoneMultiple')
     const fileInputMultiple = document.getElementById('fileInputMultiple')
     const fileList = document.getElementById('fileList')
@@ -318,8 +257,6 @@
       // pass valid dropped files to addFiles logic
       addFiles(files)
     })
-
-    // fqilter files upon acceptance
     function filterFileList(files){
 
       if(!fileList) return []
@@ -427,32 +364,24 @@
         showStatus(statusMultiple, `${selectedFiles.length} file(s) selected`, 'info')
       }
     }
-    
-    // whenever upload button is clicked 
+
     uploadBtn.addEventListener('click', async () => {
       if (selectedFiles.length === 0) return
-
+      
       const formData = new FormData()
-      
-      
       selectedFiles.forEach(file => {
-        formData.append('files',file)
+        formData.append('files', file)
       })
-
-      
       
       uploadBtn.disabled = true
-      showStatus(statusMultiple, `uploading ${selectedFiles.length} files to gridfs...`, 'info')
+      showStatus(statusMultiple, `Uploading ${selectedFiles.length} files to GridFS...`, 'info')
       
       try {
-
-        // sends POST request to backend endpoint to upload dataset...req.files...w
         const res = await fetch('/upload_dataset', {
           method: 'POST',
           body: formData
         })
         
-        // waits for promise in /upload_dataset to 
         const data = await res.json()
         
         if (data.success) {
@@ -460,9 +389,9 @@
             `Success! Uploaded ${data.filesUploaded} files to GridFS.`, 
             'success'
           )
-          console.log('multiple images upload:', data)
+          console.log('Multiple images uploaded:', data)
           
-          // Clear the selected files
+          // clear the selected files
           selectedFiles = []
           updateFileList()
         } 
@@ -510,16 +439,40 @@
     
     
     //==================== PROCESS FUNCTION ====================//
-    processDatasetBtn.addEventListener('click', async ()=>{
+    processDatasetBtn.addEventListener('click', async () => {
+      processDatasetBtn.disabled = true
       showStatus(processStatus, 'running algorithm...', 'info')
-      const res = await fetch('/process_dataset', { method: 'POST' })
-      const data = await res.json()
       
-      // status message
-      if (data.success) showStatus(processStatus, `Processing complete: ${data.message}`, 'success')
-      else showStatus(processStatus, `Error: ${data.error}`, 'error')
+      try {
 
+        console.log('here')
+        const res = await fetch('/process_dataset', { method: 'POST' })
+        const data = await res.json()
+
+        console.log('res status',res.status)
+        console.log('res ok',res.ok)
+        
+        if (data.success) {
+          showStatus(processStatus, `Processing complete: ${data.message}. Redirecting...`, 'success')
+          
+          // redirect to results page after processing is complete to view output
+          setTimeout(() => {
+            window.location.href = '/results_page'
+          }, 1500)
+        } 
+        else {
+          showStatus(processStatus, `Error: ${data.error}`, 'error')
+        }
+      } 
+      catch (error) {
+        showStatus(processStatus, `Processing failed: ${error.message}`, 'error')
+      } 
+      finally {
+        processDatasetBtn.disabled = false
+      }
     })
+    //================ NORMALIZATION PARAMETERS ================//
+    //==================== GENERATE HEATMAP ====================//
 
 
     //==================== HELPER FUNCTIONS ====================//    
