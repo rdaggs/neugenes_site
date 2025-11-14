@@ -199,51 +199,48 @@
     <!-- Right Column: Parameters (1/3 width) -->
     <div class="params-column">
       <h2>Parameters</h2>
-      
+
       <div class="param-item">
         <label for="baseDir">Base Directory</label>
         <input type="text" id="baseDir" placeholder="/path/to/dataset">
       </div>
-      
+
       <div class="param-item">
         <label for="structureAcronyms">Structure Acronyms</label>
         <input type="text" id="structureAcronyms" placeholder="FULL_BRAIN">
       </div>
-      
+
       <div class="param-item">
-        <label for="dotCount">
-          <input type="checkbox" id="dotCount" checked>
-          Dot Count
-        </label>
+        <label for="dotCount">Dot Count</label>
+        <input type="radio" id="dotCount" onchange="handleCheckbox(this, 'expressionIntensity')">
       </div>
-      
       <div class="param-item">
-        <label for="expressionIntensity">
-          <input type="checkbox" id="expressionIntensity">
-          Expression Intensity
-        </label>
+
+        <label for="expressionIntensity">Expression Intensity</label>
+        <input type="radio" id="expressionIntensity" onchange="handleCheckbox(this, 'dotCount')">
+
       </div>
-      
+
       <div class="param-item">
         <label for="thresholdScale">Threshold Scale</label>
         <input type="number" step="0.1" id="thresholdScale" value="1.0">
       </div>
-      
+
       <div class="param-item">
         <label for="layerInTiff">Layer in TIFF</label>
         <input type="number" id="layerInTiff" value="1">
       </div>
-      
+
       <div class="param-item">
         <label for="patchSize">Patch Size</label>
         <input type="number" id="patchSize" value="7">
       </div>
-      
+
       <div class="param-item">
         <label for="ringWidth">Ring Width</label>
         <input type="number" id="ringWidth" value="3">
       </div>
-      
+
       <div class="param-item">
         <label for="zThreshold">Z Threshold</label>
         <input type="number" step="0.1" id="zThreshold" value="1.2">
@@ -307,7 +304,7 @@
     document.getElementById('reprocessBtn').addEventListener('click', async () => {
       const reprocessBtn = document.getElementById('reprocessBtn')
       const reprocessStatus = document.getElementById('reprocessStatus')
-      
+
       const payload = {
         base_dir: document.getElementById('baseDir').value,
         structure_acronymns: document.getElementById('structureAcronyms').value,
@@ -342,7 +339,7 @@
 
         if (processData.success) {
           showStatus(reprocessStatus, 'Reprocessing complete! Reloading...', 'success')
-          
+
           // Reload the page to show new results
           setTimeout(() => {
             window.location.reload()
@@ -358,6 +355,11 @@
         reprocessBtn.disabled = false
       }
     })
+    function handleCheckbox(current, otherId) {
+      if (current.checked) {
+        document.getElementById(otherId).checked = false;
+      }
+    }
 
     // Load results when page loads
     loadResults()

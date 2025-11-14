@@ -34,8 +34,9 @@
       background: #ffffff;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
       text-align: center;
-      padding: 40px;
-      max-width: 800px;
+      padding: 2rem;
+      padding-right: 8rem;
+      max-width: 1500px;
       margin: 0 auto;
     }
 
@@ -83,7 +84,8 @@
       background: #77d1db;
       border-color: #075058;
     }
-    #viewResultsBtn{
+
+    #viewResultsBtn {
       margin-top: 1rem;
       padding: 0.5rem;
       background: #ffd1c3;
@@ -94,10 +96,32 @@
       border-radius: 5px;
 
     }
+
     #viewResultsBtn:hover {
       background: #d3dd66;
       border-color: #075058;
     }
+
+    /* General list styles */
+    ul {
+      list-style-type: none;
+      padding-left: 20px;
+    }
+
+    li {
+      margin: 5px 0;
+      text-align: left;
+      /* Force text alignment to the left */
+    }
+
+   
+
+    /* Checkbox styles */
+    li input[type="checkbox"] {
+      margin-right: 5px;
+      /* Add space between checkbox and text */
+    }
+
 
     input {
       border-radius: 0px;
@@ -109,8 +133,10 @@
 
     .param-section {
       background: #fffafd;
-      padding: 20px;
+      padding: 10px;
       border: 3px solid #ffdaf2;
+      padding-left: 1rem;
+      
     }
 
     .param-item {
@@ -211,81 +237,115 @@
       background: #d1ecf1;
       color: #0c5460;
     }
+
+    .two-column-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5rem;
+      margin-top: 30px;
+    }
+
+    /* Make sure sections stretch full width of each column */
+    .left-col>div,
+    .right-col>div {
+      width: 100%;
+      margin: 2rem;
+    }
+    .left-col{
+      flex: 1;
+    }
+
+    /* Keep "View Results" centered at bottom */
+    .view-results {
+      margin-top: 50px;
+      text-align: center;
+    }
   </style>
 </head>
 
 <body>
   <h1>NeuGenes Image Upload</h1>
+  <div class="two-column-grid">
 
-  <!-- Single Image Upload -->
-  <div class="upload-section">
-    <h2>Single Image Processing</h2>
-    <div id="dropZoneSingle">Drop PNG here or click to select</div>
-    <input type="file" id="fileInputSingle" accept="image/png" style="display: none">
-    <p id="statusSingle" class="status"></p>
-  </div>
+    <!-- LEFT COLUMN -->
+    <div class="left-col">
 
-  <!-- Multiple Image Upload (Dataset) -->
-  <div class="upload-section">
-    <h2>Dataset Processing (up to 25 images)</h2>
-    <div id="dropZoneMultiple">Drop PNG files here or click to select</div>
-    <input type="file" id="fileInputMultiple" accept="image/png" multiple style="display: none">
-    <div id="fileList"></div>
-    <button id="uploadBtn" style="display: none">Upload All Images</button>
-    <p id="statusMultiple" class="status"></p>
-  </div>
-
-  <!-- Parameter Selection -->
-  <div class="param-section">
-    <h2>Dataset Parameters</h2>
-    <div class="params-grid">
-      <div class="param-item">
-        <label for="baseDir">Base Directory</label>
-        <input type="text" id="baseDir" placeholder="/path/to/dataset">
+      <!-- Multiple Image Upload (Dataset) -->
+      <div class="upload-section">
+        <h2>Dataset Processing (up to 25 images)</h2>
+        <div id="dropZoneMultiple">Drop PNG files here or click to select</div>
+        <input type="file" id="fileInputMultiple" accept="image/png" multiple style="display: none">
+        <div id="fileList"></div>
+        <button id="uploadBtn" style="display: none">Upload All Images</button>
+        <p id="statusMultiple" class="status"></p>
       </div>
-      <div class="param-item">
-        <label for="structureAcronyms">Structure Acronyms</label>
-        <input type="text" id="structureAcronyms" placeholder="FULL_BRAIN">
-      </div>
-      <div class="param-item">
-        <label for="dotCount">Dot Count</label>
-        <input type="checkbox" id="dotCount" checked>
-      </div>
-      <div class="param-item">
-        <label for="expressionIntensity">Expression Intensity</label>
-        <input type="checkbox" id="expressionIntensity">
-      </div>
-      <div class="param-item">
-        <label for="thresholdScale">Threshold Scale</label>
-        <input type="number" step="0.1" id="thresholdScale" value="1.0">
-      </div>
-      <div class="param-item">
-        <label for="layerInTiff">Layer in TIFF</label>
-        <input type="number" id="layerInTiff" value="1">
-      </div>
-      <div class="param-item">
-        <label for="patchSize">Patch Size</label>
-        <input type="number" id="patchSize" value="7">
-      </div>
-      <div class="param-item">
-        <label for="ringWidth">Ring Width</label>
-        <input type="number" id="ringWidth" value="3">
-      </div>
-      <div class="param-item">
-        <label for="zThreshold">Z Threshold</label>
-        <input type="number" step="0.1" id="zThreshold" value="1.2">
+      <!-- Processing -->
+      <div class="upload-section">
+        <h2>Run Dataset Processing</h2>
+        <button id="processDatasetBtn">Process Dataset</button>
+        <p id="processStatus" class="status"></p>
       </div>
     </div>
-    <button id="saveParamsBtn">Save Parameters</button>
-    <p id="paramsStatus" class="status"></p>
+    <div class="right-col">
+
+
+      <!-- Parameter Selection -->
+      <div class="param-section">
+        <h2>Dataset Parameters</h2>
+        <div class="params-grid">
+          <div class="param-item">
+            <label for="baseDir">Base Directory</label>
+            <input type="text" id="baseDir" placeholder="/path/to/dataset">
+          </div>
+          <div class="param-item">
+            <label for="structureAcronyms">Structure Acronyms</label>
+            <input type="text" id="structureAcronyms" placeholder="FULL_BRAIN">
+          </div>
+          <div class="param-item">
+            <label for="dotCount">Dot Count</label>
+            <input type="radio" id="dotCount" onchange="handleCheckbox(this, 'expressionIntensity')">
+          </div>
+          <div class="param-item">
+
+            <label for="expressionIntensity">Expression Intensity</label>
+            <input type="radio" id="expressionIntensity" onchange="handleCheckbox(this, 'dotCount')">
+
+          </div>
+          <div class="param-item">
+            <label for="thresholdScale">Threshold Scale</label>
+            <input type="number" step="0.1" id="thresholdScale" value="1.0">
+          </div>
+          <div class="param-item">
+            <label for="layerInTiff">Layer in TIFF</label>
+            <input type="number" id="layerInTiff" value="1">
+          </div>
+          <div class="param-item">
+            <label for="patchSize">Patch Size</label>
+            <input type="number" id="patchSize" value="7">
+          </div>
+          <div class="param-item">
+            <label for="ringWidth">Ring Width</label>
+            <input type="number" id="ringWidth" value="3">
+          </div>
+          <div class="param-item">
+            <label for="zThreshold">Z Threshold</label>
+            <input type="number" step="0.1" id="zThreshold" value="1.2">
+          </div>
+        </div>
+        <button id="saveParamsBtn">Save Parameters</button>
+        <p id="paramsStatus" class="status"></p>
+      </div>
+      <div class="param-section">
+        <h2>Select Brain Structures</h2>
+        <div id="brainStructureTree"></div>
+        <p id="structureStatus" class="status"></p>
+
+      </div>
+    </div> <!-- end right-col -->
+
   </div>
 
-  <!-- Processing -->
-  <div class="upload-section">
-    <h2>Run Dataset Processing</h2>
-    <button id="processDatasetBtn">Process Dataset</button>
-    <p id="processStatus" class="status"></p>
-  </div>
+
 
   <!-- Results -->
   <div class="view-results">
@@ -509,6 +569,7 @@
       const payload = {
         base_dir: document.getElementById('baseDir').value,
         structure_acronymns: document.getElementById('structureAcronyms').value,
+        selected_structure_ids: getSelectedStructureIds(),   // <-- ADDED
         dot_count: document.getElementById('dotCount').checked,
         expression_intensity: document.getElementById('expressionIntensity').checked,
         threshold_scale: parseFloat(document.getElementById('thresholdScale').value),
@@ -517,6 +578,7 @@
         ring_width: parseInt(document.getElementById('ringWidth').value),
         z_threshold: parseFloat(document.getElementById('zThreshold').value)
       }
+
       // send parameters in JSON body to backend
       const res = await fetch('/accept_dataset_parameters', {
         method: 'POST',
@@ -580,6 +642,140 @@
       element.textContent = message
       element.className = 'status'
       if (type) element.classList.add(type)
+    }
+
+    function handleCheckbox(current, otherId) {
+      if (current.checked) {
+        document.getElementById(otherId).checked = false;
+      }
+    }
+    /* ===================== BRAIN STRUCTURE TREE LOGIC ===================== */
+
+    // Example hierarchy (you can replace with full Allen hierarchy from backend)
+    const brainTreeData = {
+      id: 997,
+      name: "root",
+      acronym: "root",
+      checked: false,
+      children: [
+        {
+          id: 8,
+          name: "Basic cell groups and regions",
+          acronym: "grey",
+          checked: false,
+          children: [
+            {
+              id: 567,
+              name: "Cerebrum",
+              acronym: "CH",
+              checked: false,
+              children: []
+            },
+            {
+              id: 343,
+              name: "Brain stem",
+              acronym: "BS",
+              checked: false,
+              children: []
+            },
+            {
+              id: 512,
+              name: "Cerebellum",
+              acronym: "CB",
+              checked: false,
+              children: []
+            }
+          ]
+        },
+        {
+          id: 1009,
+          name: "fiber tracts",
+          acronym: "fiber tracts",
+          checked: false,
+          children: []
+        },
+        {
+          id: 73,
+          name: "ventricular systems",
+          acronym: "VS",
+          checked: false,
+          children: []
+        }
+      ]
+    };
+
+    let expandedNodes = new Set();
+    let selectedStructureIds = new Set();
+
+    /* ---------- Create a single node ---------- */
+    function createTreeNode(node) {
+      const li = document.createElement("li");
+      li.id = `node-${node.id}`;
+
+      // Checkbox
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = node.checked;
+      checkbox.addEventListener("change", () => {
+        node.checked = checkbox.checked;
+
+        if (checkbox.checked) {
+          selectedStructureIds.add(node.id);
+        } else {
+          selectedStructureIds.delete(node.id);
+        }
+      });
+      li.appendChild(checkbox);
+
+      // Expand toggle text
+      const label = document.createElement("span");
+      label.className = "toggle";
+      label.style.cursor = "pointer";
+      label.style.color = "blue";
+      label.style.textDecoration = "underline";
+      label.innerHTML = `<strong>${node.name}</strong> (ID: ${node.id}, Acronym: ${node.acronym})`;
+
+      label.addEventListener("click", () => {
+        if (expandedNodes.has(node.id)) expandedNodes.delete(node.id);
+        else expandedNodes.add(node.id);
+
+        renderBrainTree();
+      });
+
+      li.appendChild(label);
+
+      // Render children only if expanded
+      if (node.children && node.children.length > 0 && expandedNodes.has(node.id)) {
+        const ul = document.createElement("ul");
+        ul.style.paddingLeft = "20px";
+
+        node.children.forEach(child => {
+          ul.appendChild(createTreeNode(child));
+        });
+
+        li.appendChild(ul);
+      }
+
+      return li;
+    }
+
+    /* ---------- Render full tree ---------- */
+    function renderBrainTree() {
+      const container = document.getElementById("brainStructureTree");
+      container.innerHTML = ""; // clear old
+
+      const ul = document.createElement("ul");
+      ul.appendChild(createTreeNode(brainTreeData));
+
+      container.appendChild(ul);
+    }
+
+    /* Initial render */
+    renderBrainTree();
+
+    /* Expose selected structures when saving parameters */
+    function getSelectedStructureIds() {
+      return Array.from(selectedStructureIds);
     }
   </script>
 </body>
