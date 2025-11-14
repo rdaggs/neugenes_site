@@ -222,6 +222,35 @@ app.get('/api/result_heatmap', (req,res) =>{
     }
 })
 
+app.get('/api/result_histogram', (req,res) =>{
+
+    try{
+
+        console.log('API /api/result_histogram called')
+        const histogramPath = path.join(DATASET_PROCESSED_DIR,'histogram.png')
+
+        if(!fs.existsSync(histogramPath)){
+            return res.status(404).json({
+                success: false, 
+                error: 'heatmap.png image not found. Please process the dataset first.' 
+            })
+        }
+
+        res.json({
+            success: true,
+            histogramPath: 'results/histogram.png'
+        })
+    }
+
+    catch(error){
+        console.error('error finding histogram:', error)
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        })
+    }
+})
+
 //===========================HELPER FUNCTIONS=========================//
 async function uploadImageGridFS(file){
     console.log(`uploading ${file.path} to gridfs`)
