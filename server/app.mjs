@@ -222,12 +222,41 @@ app.get('/api/result_heatmap', (req,res) =>{
     }
 })
 
-app.get('/api/result_histogram', (req,res) =>{
+app.get('/api/histogram_raw', (req,res) =>{
 
     try{
 
-        console.log('API /api/result_histogram called')
-        const histogramPath = path.join(DATASET_PROCESSED_DIR,'histogram.png')
+        console.log('API /api/histogram_raw called')
+        const histogramPath = path.join(DATASET_PROCESSED_DIR,'histogramRaw.png')
+
+        if(!fs.existsSync(histogramPath)){
+            return res.status(404).json({
+                success: false, 
+                error: 'heatmap.png image not found. Please process the dataset first.' 
+            })
+        }
+
+        res.json({
+            success: true,
+            histogramPath: 'results/histogram.png'
+        })
+    }
+
+    catch(error){
+        console.error('error finding histogram:', error)
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        })
+    }
+})
+
+app.get('/api/histogram_norm', (req,res) =>{
+
+    try{
+
+        console.log('API /api/histogram_norm called')
+        const histogramPath = path.join(DATASET_PROCESSED_DIR,'histogramNorm.png')
 
         if(!fs.existsSync(histogramPath)){
             return res.status(404).json({
@@ -253,7 +282,7 @@ app.get('/api/result_histogram', (req,res) =>{
 
 //===========================HELPER FUNCTIONS=========================//
 async function uploadImageGridFS(file){
-    console.log(`uploading ${file.path} to gridfs`)
+    console.log(`uploading ${file.originalname} to gridfs`)
 
     return new Promise((resolve,reject) => {
         const localPath = file.path
@@ -269,7 +298,7 @@ async function uploadImageGridFS(file){
         fs.createReadStream(localPath).pipe(uploadStream)
             .on('error', (err) => {console.error(`error uploading ${localPath} to gridfs:`, err),reject(err)})
             .on('finish', () => {
-                console.log(`uploading ${file.path} to gridfs complete`)
+                console.log(`uploading ${file.originalname} to gridfs complete`)
                 //===============DELETES DURING RUNTIME================//
                 fs.unlinkSync(localPath)
                 //=====================================================//

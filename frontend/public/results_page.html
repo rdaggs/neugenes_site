@@ -100,12 +100,17 @@
     }
 
     input[type="text"],
-    input[type="number"] {
+    input[type="number"],
+    select {
       border-radius: 0px;
       border: 2px solid #c392b2;
       padding: 8px;
       width: 100%;
       box-sizing: border-box;
+      font-family: inherit;
+      font-size: 1rem;
+      color: #333;
+      background-color: #fff;
     }
 
     input[type="checkbox"] {
@@ -173,19 +178,32 @@
       color: #0c5460;
     }
 
-    .histogram-wrapper {
-      width: 100%;
-      text-align: center;
+    .histogram-row {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
       margin-bottom: 2rem;
     }
 
-    #histogramImage {
-      max-width: 400px;   /* adjust this depending on your square size */
-      width: 100%;
+    .histogram-row img {
+      width: 300px;       /* small square */
+      height: 300px;
+      object-fit: contain;
       border: 2px solid #ffdaf2;
       padding: 6px;
       border-radius: 4px;
       background: white;
+    }
+    select.param-input {
+      border-radius: 0px;
+      border: 2px solid #c392b2;
+      padding: 8px;
+      width: 100%;
+      box-sizing: border-box;
+      background: white;
+      font-family: inherit;
+      font-size: 1rem;
+      color: #333;
     }
 
     @media (max-width: 900px) {
@@ -216,8 +234,17 @@
       <h2>Parameters</h2>
       
       <!-- Histogram container -->
-      <div class="histogram-wrapper">
-        <img src="/results/histogram.png" alt="Histogram" id="histogramImage">
+      <div class="histogram-row">
+        
+        <div class="histogram-box">
+          <div class="hist-title">Raw Expression</div>
+          <img src="/results/histogramRaw.png" alt="Histogram" id="histogramImage">
+        </div>
+
+        <div class="histogram-box">
+          <div class="hist-title">Normalized Expression</div>
+          <img src="/results/histogramNorm.png" alt="Histogram" id="histogramImage">
+        </div>
       </div>
 
       <div class="param-item">
@@ -231,19 +258,15 @@
       </div>
 
       <div class="param-item">
-        <label for="patchSize">Patch Size</label>
-        <input type="number" id="patchSize" value="7">
-      </div>
+      <label for="normType">Normalization Type</label>
+      <select id="normType">
+        <option value="none">None (Raw)</option>
+        <option value="zscore">Z-score</option>
+        <option value="minmax">Min-Max Scaling</option>
+        <option value="robust">Robust Scaling</option>
+      </select>
+    </div>
 
-      <div class="param-item">
-        <label for="ringWidth">Ring Width</label>
-        <input type="number" id="ringWidth" value="3">
-      </div>
-
-      <div class="param-item">
-        <label for="zThreshold">Z Threshold</label>
-        <input type="number" step="0.1" id="zThreshold" value="1.2">
-      </div>
 
       <button class="reprocess-btn" id="reprocessBtn">Reprocess</button>
       <p id="reprocessStatus" class="status"></p>
@@ -279,31 +302,51 @@
       }
     }
 
-    async function loadHistogram() {
+    async function loadHistograms() {
       try {
-        console.log('fetching histogram...')
+        console.log('fetching histograms...')
 
-        const response = await fetch('/api/result_histogram')
-        console.log('Histogram response:', response.status)
+        // Fetch both histogram endpoints
+        const res1 = await fetch('/api/histogram_raw')
+        console.log('Histogram 1 response:', res1.status)
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
+        if (!res1.ok) {
+          throw new Error(`HTTP error on histogram 1! status: ${res1.status}`)
         }
 
-        const data = await response.json()
-        console.log('Histogram data:', data)
+        const res2 = await fetch('/api/histogram_norm')
+        console.log('Histogram 2 response:', res2.status)
 
-        if (!data.success) {
-          console.error('Error:', data.error)
+        if (!res2.ok) {
+          throw new Error(`HTTP error on histogram 2! status: ${res2.status}`)
+        }
+
+        // Parse JSON
+        const data1 = await res1.json()
+        console.log('Histogram 1 data:', data1)
+
+        if (!data1.success) {
+          console.error('Error loading histogram 1:', data1.error)
           return
         }
 
-        const img = document.getElementById('histogramImage')
-        img.src = data.histogramPath
-        img.style.display = 'block'
+        const data2 = await res2.json()
+        console.log('Histogram 2 data:', data2)
+
+        if (!data2.success) {
+          console.error('Error loading histogram 2:', data2.error)
+          return
+        }
+
+        // Insert images into DOM
+        document.getElementById('hist1').src = data1.histogramPath
+        document.getElementById('hist2').src = data2.histogramPath
+
+        document.getElementById('hist1').style.display = 'block'
+        document.getElementById('hist2').style.display = 'block'
 
       } catch (err) {
-        console.error('Failed to load histogram:', err)
+        console.error('Failed to load histograms:', err)
       }
     }
 
@@ -337,7 +380,7 @@
         normalizationStrength: parseInt(document.getElementById('normalizationStrength').value),
         patch_size: parseInt(document.getElementById('patchSize').value),
         ring_width: parseInt(document.getElementById('ringWidth').value),
-        z_threshold: parseFloat(document.getElementById('zThreshold').value)
+        normType: parseFloat(document.getElementById('normType').value)
       }
 
       try {
