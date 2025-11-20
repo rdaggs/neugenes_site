@@ -320,10 +320,10 @@
       <div class="param-section">
         <h2>Dataset Parameters</h2>
         <div class="params-grid">
-          <!-- <div class="param-item">
-            <label for="baseDir">Base Directory</label>
-            <input type="text" id="baseDir" placeholder="/path/to/dataset">
-          </div> -->
+          <div class="param-item">
+            <label for="experimentName">Experiment Name</label>
+            <input type="text" id="baseDir" placeholder="Npsr1 GFP Mouse 1-- July 30">
+          </div>
           <!-- <div class="param-item">
             <label for="structureAcronyms">Structure Acronyms</label>
             <input type="text" id="structureAcronyms" placeholder="FULL_BRAIN">
@@ -392,6 +392,8 @@
 
     let selectedFiles = []
     const IMG_UPLOAD_CEILING = 25
+    let DATASET_ID = null;
+    let USERNAME = "mock_username";  // or get from session if you have auth
 
     // opens users file system to select files
     dropZoneMultiple.addEventListener('click', () => fileInputMultiple.click())
@@ -553,6 +555,9 @@
         formData.append('files', file)
       })
 
+      formData.append('datasetId', DATASET_ID);
+      formData.append('createdBy', USERNAME)
+      
       uploadBtn.disabled = true
       showStatus(statusMultiple, `Uploading ${selectedFiles.length} files to GridFS...`, 'info')
 
@@ -565,6 +570,7 @@
         const data = await res.json()
 
         if (data.success) {
+          DATASET_ID = data.datasetId;
           showStatus(statusMultiple,
             `Success! Uploaded ${data.filesUploaded} files to GridFS.`,
             'success'
@@ -594,7 +600,7 @@
 
     saveParamsButton.addEventListener('click', async () => {
       const payload = {
-        base_dir: document.getElementById('baseDir').value,
+        experiment_name: document.getElementById('experimentName').value,
         structure_acronymns: document.getElementById('structureAcronyms').value,
         selected_structure_ids: getSelectedStructureIds(),   // <-- ADDED
         dot_count: document.getElementById('dotCount').checked,
@@ -628,7 +634,12 @@
       try {
 
         console.log('here')
-        const res = await fetch('/process_dataset', { method: 'POST' })
+        const res = await fetch('/process_dataset', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ datasetId: DATASET_ID })
+        })
+        
         const data = await res.json()
 
         console.log('res status', res.status)
