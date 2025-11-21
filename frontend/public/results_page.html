@@ -219,7 +219,7 @@
 
   <h1>Dataset Processing Results</h1>
 
-  <div id="loadingMessage" class="loading">Loading results...</div>
+  <div id="loadingMessage" class="loading">Visualizing your results... (cell counting takes about ~50s per image)</div>
   <div id="errorMessage" class="error" style="display: none;"></div>
 
   <div id="contentWrapper" class="content-wrapper" style="display: none;">
@@ -274,11 +274,14 @@
   </div>
 
   <script>
-    async function loadHeatmap() {
+    let datasetId = '691f886f6ab787a4233128d4'
+
+    async function loadHeatmap(datasetId) {
+
       try {
         console.log('fetching heatmap...')
 
-        const response = await fetch('/api/result_heatmap')
+        const response = await fetch(`/api/result_heatmap?datasetId=${datasetId}`)
         console.log('Response status:', response.status)
 
         if (!response.ok) {
@@ -428,8 +431,8 @@
     }
 
     // Load results when page loads
-    loadHeatmap()
-    loadHistogram()
+    loadHeatmap(datasetId)
+    loadHistograms()
   </script>
 </body>
 

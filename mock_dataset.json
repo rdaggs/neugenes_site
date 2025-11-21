@@ -1,0 +1,37 @@
+{
+  "_id": "691f886f6ab787a4233128d4",
+  "name": "Mock Npsr1 GFP Mouse Dataset",
+  "description": "Pre-loaded test dataset for development",
+  "createdBy": "test_user",
+  "parameters": {
+    "experiment_name": "Npsr1 GFP Mouse 1 - July 30",
+    "structureAcronyms": ["CB", "CTX", "BS"],
+    "dotCount": true,
+    "expressionIntensity": false,
+    "thresholdScale": 1.0,
+    "layerInTiff": 1,
+    "patchSize": 7,
+    "ringWidth": 3,
+    "zThreshold": 1.2
+  },
+  "images": [
+    {
+      "fileId": "691f886f6ab787a4233128d5",
+      "filename": "brain_slice_001.png",
+      "uploadedAt": "2024-01-15T10:30:00.000Z"
+    },
+    {
+      "fileId": "691f886f6ab787a4233128d6",
+      "filename": "brain_slice_002.png",
+      "uploadedAt": "2024-01-15T10:31:00.000Z"
+    }
+  ],
+  "results": {
+    "heatmapPath": "",
+    "histogramRawPath": "",
+    "histogramNormPath": "",
+    "csvPath": ""
+  },
+  "createdAt": "2024-01-15T10:00:00.000Z",
+  "updatedAt": "2024-01-15T10:35:00.000Z"
+}

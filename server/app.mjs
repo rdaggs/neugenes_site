@@ -1,5 +1,4 @@
 //app.mjs
-import { APP_CONFIG } from '../config.mjs';
 import express from 'express'
 import mongoose from 'mongoose'
 import multer from 'multer'
@@ -9,6 +8,12 @@ import dotenv from 'dotenv'
 import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
+
+// custom functions
+import { APP_CONFIG } from '../config.mjs';
+import {generateHeatmap} from './utils.mjs'
+import { connectDatabase, createDataset,Dataset,ImageAttr,storeImage,loadMockDataset} from './db.mjs'
+
 
 dotenv.config()
 
@@ -25,8 +30,14 @@ const bucket = new mongoose.mongo.GridFSBucket(db.db, { bucketName: 'uploads' })
 console.log('mongoDB connected and GridFS ready')
 const upload = multer({ dest: path.join(__dirname, 'uploads/') })
 
+// mock mode for render 
+const USE_MOCK_DATASET = process.env.USE_MOCK_DATASET === 'true' || false
+if (USE_MOCK_DATASET) {
+    console.log('Loading mock dataset...')
+    await loadMockDataset()
+}
+
 // import database utility
-import { connectDatabase, createDataset,Dataset,ImageAttr,storeImage} from './db.mjs'
 
 // invoke connection to database
 await connectDatabase();
@@ -52,8 +63,7 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, '../frontend/public')))
 
 //==============================ROUTING==============================//
-
-
+app.use(express.json())
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/public/upload_page.html'))
 })
@@ -64,69 +74,88 @@ app.post('/upload_dataset', upload.array('files', IMG_UPLOAD_CEILING), async (re
             return res.status(400).json({ error: '0 files received' });
         }
 
-        //==================CREATE DATASET ENTRY==================//
-        const datasetInfo = {
-            name: req.body.datasetName || `Dataset ${new Date().toISOString()}`,
-            description: req.body.description || '',
-            createdBy: req.body.uploadedBy || 'anonymous',
-            parameters: {},
-            images: {},
-            results: {}
-        };
-        const dataset = await Dataset.create(datasetInfo)
-        //==================UPLOAD EACH FILE=====================//
-        const uploadResults = []
-        const uploadErrors = []
-
-        for (const file of req.files) {
-
-            try {
-
-                // store image with its metadata in gridfs
-                const result = await storeImage(file, {
-                    datasetId: dataset._id,
-                    uploadedBy: req.body.uploadedBy || 'anonymous',
-                    tags: ['dataset', dataset.name]
-                })
-
-                // add results to tracker array
-                uploadResults.push({
-                    imageId: result.imageId,
-                    originalName: file.originalname,
-                    success: true
+        //==================USE EXISTING DATASET==================//
+        let dataset
+        let datasetId = req.body.datasetId
+        if (datasetId) {
+            console.log('Using existing dataset:', datasetId)
+            dataset = await Dataset.findById(datasetId)
+            
+            if (!dataset) {
+                return res.status(404).json({ 
+                    error: `Dataset ${datasetId} not found` 
                 })
             }
-            catch (error) {
-                console.error(`Error processing file ${file.originalname}:`, error);
-                uploadErrors.push({
-                    originalName: file.originalname,
-                    error: error.message
-                })
+        } 
+  
+        //==================CREATE DATASET ENTRY==================//
+        else{
+            
+            const datasetInfo = {
+                name: req.body.datasetName || `Dataset ${new Date().toISOString()}`,
+                description: req.body.description || '',
+                createdBy: req.body.uploadedBy || 'anonymous',
+                parameters: {},
+                images: {},
+                results: {}
+            };
+            const dataset = await Dataset.create(datasetInfo)
+            
+            //==================UPLOAD EACH FILE=====================//
+            const uploadResults = []
+            const uploadErrors = []
 
-                // clean up corrupt file
+            for (const file of req.files) {
+
                 try {
-                    if (fs.existsSync(file.path)) {
-                        fs.unlinkSync(file.path);
+
+                    // store image with its metadata in gridfs
+                    const result = await storeImage(file, {
+                        datasetId: dataset._id,
+                        uploadedBy: req.body.uploadedBy || 'anonymous',
+                        tags: ['dataset', dataset.name]
+                    })
+
+                    // add results to tracker array
+                    uploadResults.push({
+                        imageId: result.imageId,
+                        originalName: file.originalname,
+                        success: true
+                    })
+                }
+                catch (error) {
+                    console.error(`Error processing file ${file.originalname}:`, error);
+                    uploadErrors.push({
+                        originalName: file.originalname,
+                        error: error.message
+                    })
+
+                    // clean up corrupt file
+                    try {
+                        if (fs.existsSync(file.path)) {
+                            fs.unlinkSync(file.path);
+                        }
+                    } catch (e) {
+                        console.error('Error cleaning up file:', e);
                     }
-                } catch (e) {
-                    console.error('Error cleaning up file:', e);
                 }
             }
-        }
 
-        //==================LOG RESULTS=====================//
-        await Dataset.findByIdAndUpdate(dataset._id, {
-            status: 'uploading',
-            imageCount: uploadResults.length
-        })
-        res.json({
-            success: true,
-            datasetId: dataset._id,
-            filesUploaded: uploadResults.length,
-            filesFailed: uploadErrors.length,
-            uploadedFiles: uploadResults,
-            errors: uploadErrors
-        })
+            //==================LOG RESULTS=====================//
+            await Dataset.findByIdAndUpdate(dataset._id, {
+                status: 'uploading',
+                imageCount: uploadResults.length
+            })
+            res.json({
+                success: true,
+                datasetId: dataset._id,
+                filesUploaded: uploadResults.length,
+                filesFailed: uploadErrors.length,
+                uploadedFiles: uploadResults,
+                errors: uploadErrors
+            })
+        }
+        
     }
     catch (error) {
         console.error('Error processing dataset upload:', error);
@@ -205,6 +234,7 @@ app.post('/accept_dataset_parameters', express.json(), (req, res) => {
 })
 
 app.post('/process_dataset', async (req, res) => {
+    
 
     try {
         const { datasetId } = req.body
@@ -230,7 +260,7 @@ app.post('/process_dataset', async (req, res) => {
             datasetId: datasetId,
             'validation.isValid': true
         })
-        //===================PYTHON ROCESSING===================// 
+        //===================BRAIN PROCESSING===================// 
         //                                                      //
         //======================================================// 
         res.json({
@@ -261,23 +291,63 @@ app.get('/results_page', (req, res) => {
 app.use('/results', express.static(DATASET_PROCESSED_DIR))
 
 
-app.get('/api/result_heatmap', (req, res) => {
+app.get('/api/result_heatmap', async (req, res) => {
 
+    let datasetId = req.query.datasetId
     try {
+        console.log('datasetId on result: ',datasetId)
+        //====================================================================//
+        if (!datasetId) {
+            console.log('no datasetId')
+            return res.status(400).json({
+                success: false,
+                error: 'datasetId is required'
+            })
+        }
 
-        console.log('API /api/result_heatmap called')
-        const heatMapPath = path.join(DATASET_PROCESSED_DIR, 'heatmap.png')
+        const dataset = await Dataset.findById(datasetId)
+        if (!dataset) {
+            return res.status(404).json({
+                success: false,
+                error: 'dataset not found'
+            })
+        }
 
-        if (!fs.existsSync(heatMapPath)) {
+        // check if heatmap already exists
+        if (dataset.results.heatmapPath) {
+            console.log(`heatmap already exists at ${dataset.results.heatmapPath}`)
+            const relativePath = path.relative(DATASET_PROCESSED_DIR, dataset.results.heatmapPath)
+            return res.json({
+                success: true,
+                heatMapPath: `/results/${dataset.results.heatmapPath}`,
+                alreadyExists: true
+            })
+        }
+        
+        //===================ACTUAL PROCESSING===================// 
+        const result = await generateHeatmap(datasetId)
+        const relativeFromRoot = path.relative(DATASET_PROCESSED_DIR, result.heatmapPath)
+
+        // save to database
+        await Dataset.findByIdAndUpdate(
+            datasetId,
+            { 
+                $set: { 
+                    'results.heatmapPath': relativeFromRoot
+                } 
+            }
+        )
+        //======================================================//
+        if (!fs.existsSync(relativePath)) {
             return res.status(404).json({
                 success: false,
                 error: 'heatmap.png image not found. Please process the dataset first.'
             })
         }
-
+        console
         res.json({
             success: true,
-            heatMapPath: 'results/heatmap.png'
+            heatMapPath: `/results/${relativePath}`
         })
     }
 
@@ -294,7 +364,6 @@ app.get('/api/histogram_raw', (req, res) => {
 
     try {
 
-        console.log('API /api/histogram_raw called')
         const histogramPath = path.join(DATASET_PROCESSED_DIR, 'histogramRaw.png')
 
         if (!fs.existsSync(histogramPath)) {
@@ -306,7 +375,7 @@ app.get('/api/histogram_raw', (req, res) => {
 
         res.json({
             success: true,
-            histogramPath: 'results/histogram.png'
+            histogramPath: 'results/histogramRaw.png'
         })
     }
 
@@ -323,7 +392,6 @@ app.get('/api/histogram_norm', (req, res) => {
 
     try {
 
-        console.log('API /api/histogram_norm called')
         const histogramPath = path.join(DATASET_PROCESSED_DIR, 'histogramNorm.png')
 
         if (!fs.existsSync(histogramPath)) {
@@ -335,7 +403,7 @@ app.get('/api/histogram_norm', (req, res) => {
 
         res.json({
             success: true,
-            histogramPath: 'results/histogram.png'
+            histogramPath: 'results/histogramNorm.png'
         })
     }
 

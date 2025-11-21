@@ -1,0 +1,4 @@
+brainglobe-heatmap 
+pandas 
+numpy
+matplotlib

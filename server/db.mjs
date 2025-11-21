@@ -5,6 +5,8 @@ import sharp from 'sharp';
 import dotenv from 'dotenv';
 import { APP_CONFIG } from '../config.mjs';
 import fs from 'fs'
+import path from 'path';  // ADD THIS
+import { fileURLToPath } from 'url';  // ADD THIS
 
 
 
@@ -15,6 +17,11 @@ const IMG_MAX_BYTES = IMG_MAX * 1024 * 1024;
 //=====================CONNECTION MANAGEMENT=====================//
 let db = null;
 let bucket = null;
+
+
+// ADD THESE TWO LINES
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 
 export async function connectDatabase() {
@@ -104,7 +111,10 @@ const imageSchema = mongoose.Schema({
         dotCount: Number,
         expressionIntensity: Number,
         processedAt: Date,
-        processingTime: Number, // in milliseconds
+        processingTime: Number, // in milliseconds,
+        result_csv_path: String,
+        result_norm_csv_path: String,
+        heatmap_path: String,
         errors: [String]
     },
 
@@ -320,7 +330,7 @@ export async function storeImage(file, options = {}) {
                             uploadedAt: new Date()
                         }
                     },
-                    $inc: { imageCount: 1 }
+                    //$inc: { imageCount: 1 }
                 }
             );
         }
@@ -455,7 +465,7 @@ export async function deleteImage(imageId) {
                 datasetId,
                 {
                     $pull: { images: { fileId: gridFsId } },
-                    $inc: { imageCount: -1 }
+                    //$inc: { imageCount: -1 }
                 }
             )
         }
@@ -616,6 +626,35 @@ export async function getImageFromGridFS(gridFsId, outputPath = null) {
     catch (error) {
         console.error('Error retrieving image from GridFS:', error)
         throw new Error(`Failed to get image from GridFS: ${error.message}`)
+    }
+}
+
+export async function loadMockDataset(mockFilePath = '../mock_dataset.json') {
+    try {
+        const fullPath = path.join(__dirname, mockFilePath)
+        
+        if (!fs.existsSync(fullPath)) {
+            console.warn(`Mock dataset file not found at ${fullPath}`)
+            return null
+        }
+
+        const mockData = JSON.parse(fs.readFileSync(fullPath, 'utf8'))
+        
+        // Check if dataset already exists
+        const existing = await Dataset.findById(mockData._id)
+        if (existing) {
+            console.log(`Mock dataset ${mockData._id} already exists, skipping...`)
+            return existing
+        }
+
+        // Insert the mock dataset
+        const dataset = await Dataset.create(mockData)
+        console.log(`✓ Mock dataset loaded: ${dataset._id} - ${dataset.name}`)
+        return dataset
+
+    } catch (error) {
+        console.error('Error loading mock dataset:', error)
+        return null
     }
 }
 

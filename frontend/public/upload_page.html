@@ -114,7 +114,7 @@
       /* Force text alignment to the left */
     }
 
-   
+
 
     /* Checkbox styles */
     li input[type="checkbox"] {
@@ -137,9 +137,10 @@
       border: 3px solid #ffdaf2;
       padding-left: 1rem;
       align-items: right;
-      gap: 8px;   /* spacing between label + radio */
+      gap: 8px;
+      /* spacing between label + radio */
       margin-bottom: 6px;
-      
+
     }
 
     .param-item {
@@ -251,7 +252,8 @@
 
     .params-grid {
       display: grid;
-      grid-template-columns: 160px 120px;  /* label column | input column */
+      grid-template-columns: 160px 120px;
+      /* label column | input column */
       row-gap: 12px;
       column-gap: 10px;
       align-items: center;
@@ -263,14 +265,15 @@
       width: 100px;
     }
 
-.param-item {
-  display: contents; /* IMPORTANT: lets label + input fall into the grid cells */
-}
+    .param-item {
+      display: contents;
+      /* IMPORTANT: lets label + input fall into the grid cells */
+    }
 
-.param-item label {
-  text-align: right;
-  padding-right: 8px;
-}
+    .param-item label {
+      text-align: right;
+      padding-right: 8px;
+    }
 
     /* Make sure sections stretch full width of each column */
     .left-col>div,
@@ -278,7 +281,8 @@
       width: 100%;
       margin: 2rem;
     }
-    .left-col{
+
+    .left-col {
       flex: 1;
     }
 
@@ -381,6 +385,10 @@
   </div>
   <script>
 
+    let DATASET_ID = '691f886f6ab787a4233128d4'; // Your mock dataset ID
+    let USERNAME = "test_user"
+    let selectedFiles = []
+    const IMG_UPLOAD_CEILING = 25
 
     //====================== IMAGE UPLOAD ======================//
     const dropZoneMultiple = document.getElementById('dropZoneMultiple')
@@ -390,10 +398,7 @@
     const statusMultiple = document.getElementById('statusMultiple')
     const viewResultsBtn = document.getElementById('viewResultsBtn')
 
-    let selectedFiles = []
-    const IMG_UPLOAD_CEILING = 25
-    let DATASET_ID = null;
-    let USERNAME = "mock_username";  // or get from session if you have auth
+  
 
     // opens users file system to select files
     dropZoneMultiple.addEventListener('click', () => fileInputMultiple.click())
@@ -549,15 +554,15 @@
 
     uploadBtn.addEventListener('click', async () => {
       if (selectedFiles.length === 0) return
-
+      
       const formData = new FormData()
       selectedFiles.forEach(file => {
         formData.append('files', file)
       })
-
+      console.log('datasetId:',DATASET_ID)
       formData.append('datasetId', DATASET_ID);
       formData.append('createdBy', USERNAME)
-      
+
       uploadBtn.disabled = true
       showStatus(statusMultiple, `Uploading ${selectedFiles.length} files to GridFS...`, 'info')
 
@@ -634,12 +639,12 @@
       try {
 
         console.log('here')
-        const res = await fetch('/process_dataset', { 
-          method: 'POST', 
+        const res = await fetch('/process_dataset', {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ datasetId: DATASET_ID })
         })
-        
+
         const data = await res.json()
 
         console.log('res status', res.status)
@@ -669,11 +674,6 @@
     viewResultsBtn.addEventListener('click', () => {
       window.location.href = '/results_page'
     })
-
-
-    //================ NORMALIZATION PARAMETERS ================//
-    //==================== GENERATE HEATMAP ====================//
-
 
     //==================== HELPER FUNCTIONS ====================//    
     function showStatus(element, message, type) {
