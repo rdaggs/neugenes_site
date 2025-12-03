@@ -315,8 +315,10 @@ export async function storeImage(file, options = {}) {
             datasetId: options.datasetId,
             uploadedBy: options.uploadedBy || 'anonymous',
         })
-
+        //+++++++++++++++++++++TEMP DISABLE+++++++++++++++++++++//
         await imageDB.save()
+        //++++++++++++++++++++++++++++++++++++++++++++++++++++++//
+
         console.log(`image ${file.originalname} saved (id: ${imageDB._id})`)
 
         if (options.datasetId) {

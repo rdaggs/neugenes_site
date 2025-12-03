@@ -10,9 +10,10 @@ import fs from 'fs'
 import { fileURLToPath } from 'url'
 
 // custom functions
-import { APP_CONFIG } from '../config.mjs';
-import {generateHeatmap} from './utils.mjs'
-import { connectDatabase, createDataset,Dataset,ImageAttr,storeImage,loadMockDataset} from './db.mjs'
+import { APP_CONFIG } from '../config.mjs'
+import { processDataset } from './processor.mjs'
+import { generateHeatmap,generateHistogram } from './utils.mjs'
+import { connectDatabase, Dataset, ImageAttr, storeImage } from './db.mjs'
 
 
 dotenv.config()
@@ -29,15 +30,6 @@ const db = conn.connection
 const bucket = new mongoose.mongo.GridFSBucket(db.db, { bucketName: 'uploads' })
 console.log('mongoDB connected and GridFS ready')
 const upload = multer({ dest: path.join(__dirname, 'uploads/') })
-
-// mock mode for render 
-//const USE_MOCK_DATASET = process.env.USE_MOCK_DATASET === 'true' || false
-const USE_MOCK_DATASET = process.env.USE_MOCK_DATASET === false
-
-if (USE_MOCK_DATASET) {
-    console.log('Loading mock dataset...')
-    await loadMockDataset()
-}
 
 // import database utility
 
@@ -86,19 +78,19 @@ app.post('/upload_dataset', upload.array('files', IMG_UPLOAD_CEILING), async (re
         if (datasetId === 'undefined' || datasetId === 'null' || !datasetId) {
             datasetId = null
         }
-        
+
         //==================USE EXISTING DATASET==================//
         console.log('Using existing dataset:', datasetId)
         if (datasetId) {
             dataset = await Dataset.findById(datasetId)
 
             if (!dataset) {
-                return res.status(404).json({ 
-                    error: `Dataset ${datasetId} not found` 
+                return res.status(404).json({
+                    error: `Dataset ${datasetId} not found`
                 })
             }
 
-        } 
+        }
 
         //==================CREATE DATASET ENTRY==================//
         else {
@@ -112,9 +104,9 @@ app.post('/upload_dataset', upload.array('files', IMG_UPLOAD_CEILING), async (re
                 results: {}
             }
             dataset = await Dataset.create(datasetInfo)
-            
+
             //==================UPLOAD EACH FILE=====================//
-            
+
 
             for (const file of req.files) {
 
@@ -209,7 +201,7 @@ app.post('/accept_dataset_parameters', async (req, res) => {
             ring_width,
             z_threshold
         } = req.body
-        console.log('accepting parameters for',datasetId)
+        console.log('accepting parameters for', datasetId)
 
         if (!datasetId) {
             return res.status(400).json({
@@ -226,7 +218,7 @@ app.post('/accept_dataset_parameters', async (req, res) => {
                 error: 'Dataset not found'
             })
         }
-        
+
 
         // quick validation
         if (!experiment_name || !structure_acronymns) {
@@ -250,9 +242,9 @@ app.post('/accept_dataset_parameters', async (req, res) => {
         })
         console.log(`Dataset created: ${dataset._id}`);
 
-        return res.json({ 
-            success: true, 
-            datasetId: dataset._id 
+        return res.json({
+            success: true,
+            datasetId: dataset._id
         })
 
 
@@ -265,7 +257,7 @@ app.post('/accept_dataset_parameters', async (req, res) => {
 })
 
 app.post('/process_dataset', async (req, res) => {
-    
+
 
     try {
         const { datasetId } = req.body
@@ -291,16 +283,20 @@ app.post('/process_dataset', async (req, res) => {
             datasetId: datasetId,
             'validation.isValid': true
         })
-        
+
         if (images.length === 0) {
             return res.status(400).json({
                 success: false,
                 error: 'No valid images found in dataset'
             })
         }
+        await Dataset.findByIdAndUpdate(datasetId, {
+            status: 'processing',
+            'results.startedAt': new Date()
+        })
 
         //===================BRAIN PROCESSING===================// 
-        //                                                      //
+        processDataset(datasetId)
         //======================================================// 
         res.json({
             success: true,
@@ -334,7 +330,7 @@ app.get('/api/result_heatmap', async (req, res) => {
 
     let datasetId = req.query.datasetId
     try {
-        console.log('datasetId on result: ',datasetId)
+        console.log('datasetId on result: ', datasetId)
         //====================================================================//
         if (!datasetId) {
             console.log('no datasetId')
@@ -355,25 +351,24 @@ app.get('/api/result_heatmap', async (req, res) => {
         // check if heatmap already exists
         if (dataset.results.heatmapPath) {
             console.log(`heatmap already exists at ${dataset.results.heatmapPath}`)
-            const relativePath = path.relative(DATASET_PROCESSED_DIR, dataset.results.heatmapPath)
             return res.json({
                 success: true,
                 heatMapPath: `/results/${dataset.results.heatmapPath}`,
                 alreadyExists: true
             })
         }
-        
+
         //===================ACTUAL PROCESSING===================// 
         const result = await generateHeatmap(datasetId)
-        const relativeFromRoot = path.relative(DATASET_PROCESSED_DIR, result.heatmapPath)
+        const relativePath = path.relative(DATASET_PROCESSED_DIR, result.heatmapPath)
 
         // save to database
         await Dataset.findByIdAndUpdate(
             datasetId,
-            { 
-                $set: { 
-                    'results.heatmapPath': relativeFromRoot
-                } 
+            {
+                $set: {
+                    'results.heatmapPath': relativePath
+                }
             }
         )
         //======================================================//
@@ -399,27 +394,48 @@ app.get('/api/result_heatmap', async (req, res) => {
     }
 })
 
-app.get('/api/histogram_raw', (req, res) => {
+app.get('/api/histogram_raw', async (req, res) => {
 
     try {
+        const datasetId = req.query.datasetId
 
-        const histogramPath = path.join(DATASET_PROCESSED_DIR, 'histogramRaw.png')
-
-        if (!fs.existsSync(histogramPath)) {
-            return res.status(404).json({
+        if (!datasetId) {
+            return res.status(400).json({
                 success: false,
-                error: 'heatmap.png image not found. Please process the dataset first.'
+                error: 'datasetId is required'
             })
         }
 
+        const dataset = await Dataset.findById(datasetId)
+        if (!dataset) {
+            return res.status(404).json({
+                success: false,
+                error: 'Dataset not found'
+            })
+        }
+
+        // check if histogram already exists 
+        if (dataset.results?.histogramRawPath && fs.existsSync(dataset.results.histogramRawPath)) {
+            const relativePath = path.relative(DATASET_PROCESSED_DIR, result.histogramPath)
+            return res.json({
+                success: true,
+                histogramPath: `/results/${relativePath}`,
+                alreadyExists: true
+            })
+        }
+
+        // generate histogram
+        const result = await generateHistogram(datasetId, true, params = false)
+        const relativePath = path.relative(DATASET_PROCESSED_DIR, dataset.results.histogramRawPath)
         res.json({
             success: true,
-            histogramPath: 'results/histogramRaw.png'
+            histogramPath: `/results/${relativePath}`
         })
+
     }
 
     catch (error) {
-        console.error('error finding histogram:', error)
+        console.error('error findin/generating raw histogram:', error)
         res.status(500).json({
             success: false,
             error: error.message
@@ -427,27 +443,51 @@ app.get('/api/histogram_raw', (req, res) => {
     }
 })
 
-app.get('/api/histogram_norm', (req, res) => {
+app.get('/api/histogram_norm', async (req, res) => {
 
     try {
+        const datasetId = req.query.datasetId
 
-        const histogramPath = path.join(DATASET_PROCESSED_DIR, 'histogramNorm.png')
-
-        if (!fs.existsSync(histogramPath)) {
-            return res.status(404).json({
+        if (!datasetId) {
+            return res.status(400).json({
                 success: false,
-                error: 'heatmap.png image not found. Please process the dataset first.'
+                error: 'datasetId is required'
             })
         }
 
+        const dataset = await Dataset.findById(datasetId)
+        if (!dataset) {
+            return res.status(404).json({
+                success: false,
+                error: 'Dataset not found'
+            })
+        }
+
+        // check if histogram already exists 
+        if (dataset.results?.histogramNormPath && fs.existsSync(dataset.results.histogramNormPath)) {
+            const relativePath = path.relative(DATASET_PROCESSED_DIR, dataset.results.histogramNormPath)
+            return res.json({
+                success: true,
+                histogramPath: `/results/${relativePath}`,
+                alreadyExists: true
+            })
+        }
+
+        // generate histogram
+        //=============================ACCEPT RENORMALIZING PARAMS=============================//
+        const temp_renormalizing = {'z_score': 2}
+        //====================================================================================//
+        const result = await generateHistogram(datasetId, false, temp_renormalizing)
+        const relativePath = path.relative(DATASET_PROCESSED_DIR, dataset.results.histogramNormPath)
         res.json({
             success: true,
-            histogramPath: 'results/histogramNorm.png'
+            histogramPath: `/results/${relativePath}`
         })
+
     }
 
     catch (error) {
-        console.error('error finding histogram:', error)
+        console.error('error findin/generating normalized histogram:', error)
         res.status(500).json({
             success: false,
             error: error.message

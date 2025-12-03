@@ -33,12 +33,11 @@ export async function generateHeatmap(datasetId) {
         if (!dataset) {
             throw new Error(`dataset with id:${datasetId} dne`)
         }
-        //console.log('csvPath',csvPath)
-
 
         // check if csv exists 
         let csvPath;
         if (dataset.results.result_norm_csv_path) {
+            console.log('using result_norm_csv_path')
             csvPath = dataset.results.csvPathNorm;
         }
         else {
@@ -57,7 +56,7 @@ export async function generateHeatmap(datasetId) {
         return new Promise((resolve, reject) => {
 
             const heatmapProcess = spawn('python', [
-                path.join(HEATMAP_GENERATOR,'generate_heatmap_per_dataset.py'),
+                path.join(HEATMAP_GENERATOR, 'generate_heatmap_per_dataset.py'),
                 path.join(DATASET_PROCESSED_DIR, 'result_norm.csv'),
                 '--output', path.join(DATASET_PROCESSED_DIR, 'result_norm.png')
             ])
@@ -67,7 +66,7 @@ export async function generateHeatmap(datasetId) {
             let stdoutData = ''
             let stderrData = ''
             const heatmapPath = path.join(DATASET_PROCESSED_DIR, 'result_norm.png')
-            console.log('heatmapPath',heatmapPath)
+            console.log('heatmapPath', heatmapPath)
 
 
             heatmapProcess.stdout.on('data', (data) => {
@@ -117,6 +116,49 @@ export async function generateHeatmap(datasetId) {
     }
     catch (error) {
         console.error('error in generateHeatmap:', error)
+        throw error
+    }
+}
+
+
+export async function generateHistogram(datasetId, raw = true, params) {
+    try {
+        if (!datasetId) {
+            throw new Error('datasetId is required')
+        }
+
+        const dataset = await Dataset.findById(datasetId)
+        if (!dataset) {
+            throw new Error(`dataset with id:${datasetId} dne`)
+        }
+
+
+        let csvPath
+        let outputFilename
+
+        if (raw) {
+            csvPath = dataset.results?.csvPath || path.join(DATASET_PROCESSED_DIR, 'result_raw.csv')
+            outputFilename = 'histogramRaw.png'
+        }
+        else {
+            csvPath = dataset.results?.csvPathNorm || path.join(DATASET_PROCESSED_DIR, 'result_norm.csv')
+            outputFilename = 'histogramNorm.png'
+        }
+
+        if (!fs.existsSync(csvPath)) {
+            throw new Error(`CSV not found at ${csvPath}`)
+        }
+
+        const outputPath = path.join(DATASET_PROCESSED_DIR, outputFilename)
+        console.log(`Generating ${raw ? 'raw' : 'normalized'} histogram for dataset ${datasetId}`)
+        console.log(`Input CSV: ${csvPath} and Output: ${outputPath}`)
+
+        return new Promise((resolve, reject) => {
+            // python calling of generate_histogram.py
+        })
+    }
+    catch (error) {
+        console.error('error in generateHistogram:', error)
         throw error
     }
 }
