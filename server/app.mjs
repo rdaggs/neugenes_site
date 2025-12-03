@@ -31,7 +31,9 @@ console.log('mongoDB connected and GridFS ready')
 const upload = multer({ dest: path.join(__dirname, 'uploads/') })
 
 // mock mode for render 
-const USE_MOCK_DATASET = process.env.USE_MOCK_DATASET === 'true' || false
+//const USE_MOCK_DATASET = process.env.USE_MOCK_DATASET === 'true' || false
+const USE_MOCK_DATASET = process.env.USE_MOCK_DATASET === false
+
 if (USE_MOCK_DATASET) {
     console.log('Loading mock dataset...')
     await loadMockDataset()
@@ -69,28 +71,38 @@ app.get('/', (req, res) => {
 })
 
 app.post('/upload_dataset', upload.array('files', IMG_UPLOAD_CEILING), async (req, res) => {
+    console.log('Files received:', req.files?.length)
     try {
         if (!req.files || req.files.length === 0) {
             return res.status(400).json({ error: '0 files received' });
         }
 
-        //==================USE EXISTING DATASET==================//
         let dataset
         let datasetId = req.body.datasetId
+        const uploadResults = []
+        const uploadErrors = []
+
+        // sanitize value 
+        if (datasetId === 'undefined' || datasetId === 'null' || !datasetId) {
+            datasetId = null
+        }
+        
+        //==================USE EXISTING DATASET==================//
+        console.log('Using existing dataset:', datasetId)
         if (datasetId) {
-            console.log('Using existing dataset:', datasetId)
             dataset = await Dataset.findById(datasetId)
-            
+
             if (!dataset) {
                 return res.status(404).json({ 
                     error: `Dataset ${datasetId} not found` 
                 })
             }
+
         } 
-  
+
         //==================CREATE DATASET ENTRY==================//
-        else{
-            
+        else {
+            console.log('Create dataset entry:', datasetId)
             const datasetInfo = {
                 name: req.body.datasetName || `Dataset ${new Date().toISOString()}`,
                 description: req.body.description || '',
@@ -98,12 +110,11 @@ app.post('/upload_dataset', upload.array('files', IMG_UPLOAD_CEILING), async (re
                 parameters: {},
                 images: {},
                 results: {}
-            };
-            const dataset = await Dataset.create(datasetInfo)
+            }
+            dataset = await Dataset.create(datasetInfo)
             
             //==================UPLOAD EACH FILE=====================//
-            const uploadResults = []
-            const uploadErrors = []
+            
 
             for (const file of req.files) {
 
@@ -146,16 +157,21 @@ app.post('/upload_dataset', upload.array('files', IMG_UPLOAD_CEILING), async (re
                 status: 'uploading',
                 imageCount: uploadResults.length
             })
-            res.json({
-                success: true,
-                datasetId: dataset._id,
-                filesUploaded: uploadResults.length,
-                filesFailed: uploadErrors.length,
-                uploadedFiles: uploadResults,
-                errors: uploadErrors
-            })
         }
-        
+
+        //==================FINALIZE=====================//
+        await Dataset.findByIdAndUpdate(dataset._id, {
+            status: 'uploaded',
+            imageCount: uploadResults.length
+        })
+        res.json({
+            success: true,
+            datasetId: dataset._id.toString(),  // Convert ObjectId to string
+            filesUploaded: uploadResults.length,
+            filesFailed: uploadErrors.length,
+            uploadedFiles: uploadResults,
+            errors: uploadErrors
+        })
     }
     catch (error) {
         console.error('Error processing dataset upload:', error);
@@ -179,7 +195,7 @@ app.post('/upload_dataset', upload.array('files', IMG_UPLOAD_CEILING), async (re
     }
 })
 
-app.post('/accept_dataset_parameters', express.json(), (req, res) => {
+app.post('/accept_dataset_parameters', async (req, res) => {
     try {
         const {
             datasetId,
@@ -193,10 +209,28 @@ app.post('/accept_dataset_parameters', express.json(), (req, res) => {
             ring_width,
             z_threshold
         } = req.body
+        console.log('accepting parameters for',datasetId)
+
+        if (!datasetId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing datasetId'
+            })
+        }
+
+        // get dataset parameters
+        const dataset = await Dataset.findById(datasetId)
+        if (!dataset) {
+            return res.status(404).json({
+                success: false,
+                error: 'Dataset not found'
+            })
+        }
+        
 
         // quick validation
-        if (!base_dir || !structure_acronymns) {
-            return res.status(400).json({ success: false, error: 'Missing base_dir or structure_acronymns' })
+        if (!experiment_name || !structure_acronymns) {
+            return res.status(400).json({ success: false, error: 'Missing experiment name or structure acronymns' })
         }
 
         // store parameters
@@ -211,18 +245,15 @@ app.post('/accept_dataset_parameters', express.json(), (req, res) => {
             ring_width: parseInt(ring_width) || 3,
             z_threshold: parseFloat(z_threshold) || 1.2
         }
-
-        // no dataset
-        if (!dataset) {
-            return res.status(404).json({
-                success: false,
-                error: 'dataset not found'
-            })
-        }
-
+        await Dataset.findByIdAndUpdate(datasetId, {
+            parameters: parameters
+        })
         console.log(`Dataset created: ${dataset._id}`);
 
-        return res.json({ success: true, datasetId: dataset._id })
+        return res.json({ 
+            success: true, 
+            datasetId: dataset._id 
+        })
 
 
     }
@@ -260,6 +291,14 @@ app.post('/process_dataset', async (req, res) => {
             datasetId: datasetId,
             'validation.isValid': true
         })
+        
+        if (images.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'No valid images found in dataset'
+            })
+        }
+
         //===================BRAIN PROCESSING===================// 
         //                                                      //
         //======================================================// 

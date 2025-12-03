@@ -310,6 +310,7 @@
         <button id="uploadBtn" style="display: none">Upload All Images</button>
         <p id="statusMultiple" class="status"></p>
       </div>
+      
       <!-- Processing -->
       <div class="upload-section">
         <h2>Run Dataset Processing</h2>
@@ -381,11 +382,11 @@
   <!-- Results -->
   <div class="view-results">
     <button id="viewResultsBtn">View Results</button>
-    <p id="processStatus" class="status"></p>
+    <p id="viewResultsBtn" class="status"></p>
   </div>
   <script>
 
-    let DATASET_ID = '691f886f6ab787a4233128d4'; // Your mock dataset ID
+    let DATASET_ID = null //= '691f886f6ab787a4233128d4' // Your mock dataset ID
     let USERNAME = "test_user"
     let selectedFiles = []
     const IMG_UPLOAD_CEILING = 25
@@ -397,6 +398,8 @@
     const uploadBtn = document.getElementById('uploadBtn')
     const statusMultiple = document.getElementById('statusMultiple')
     const viewResultsBtn = document.getElementById('viewResultsBtn')
+    const processDatasetBtn = document.getElementById('processDatasetBtn')  // ADD THIS LINE
+    const processStatus = document.getElementById('processStatus')  // ADD THIS LINE
 
   
 
@@ -553,18 +556,26 @@
     }
 
     uploadBtn.addEventListener('click', async () => {
-      if (selectedFiles.length === 0) return
       
+      // setup
+      if (selectedFiles.length === 0) return
       const formData = new FormData()
+
       selectedFiles.forEach(file => {
         formData.append('files', file)
       })
-      console.log('datasetId:',DATASET_ID)
-      formData.append('datasetId', DATASET_ID);
-      formData.append('createdBy', USERNAME)
 
+      // handle datasetId
+      if (DATASET_ID && DATASET_ID !== 'undefined' && DATASET_ID !== 'null') {
+        console.log('Using existing datasetId:', DATASET_ID)
+        formData.append('datasetId', DATASET_ID);
+      } 
+      else {console.log('no datasetId - will create new dataset')}
+
+      // add username to form data
+      formData.append('createdBy', USERNAME)    
       uploadBtn.disabled = true
-      showStatus(statusMultiple, `Uploading ${selectedFiles.length} files to GridFS...`, 'info')
+      showStatus(statusMultiple, `Uploading ${selectedFiles.length} files to database...`, 'info')
 
       try {
         const res = await fetch('/upload_dataset', {
@@ -575,6 +586,7 @@
         const data = await res.json()
 
         if (data.success) {
+          console.log('DATASET_ID set to:', DATASET_ID)
           DATASET_ID = data.datasetId;
           showStatus(statusMultiple,
             `Success! Uploaded ${data.filesUploaded} files to GridFS.`,
@@ -605,8 +617,9 @@
 
     saveParamsButton.addEventListener('click', async () => {
       const payload = {
-        experiment_name: document.getElementById('experimentName').value,
-        structure_acronymns: document.getElementById('structureAcronyms').value,
+        datasetId:  DATASET_ID,
+        experiment_name: document.getElementById('baseDir').value,
+        structure_acronymns: Array.from(selectedStructureIds),
         selected_structure_ids: getSelectedStructureIds(),   // <-- ADDED
         dot_count: document.getElementById('dotCount').checked,
         expression_intensity: document.getElementById('expressionIntensity').checked,
@@ -633,12 +646,11 @@
 
     //==================== PROCESS FUNCTION ====================//
     processDatasetBtn.addEventListener('click', async () => {
-      processDatasetBtn.disabled = true
+      //processDatasetBtn.disabled = true
       showStatus(processStatus, 'running algorithm...', 'info')
 
       try {
 
-        console.log('here')
         const res = await fetch('/process_dataset', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -672,7 +684,12 @@
 
     //====================== RESULTS PAGE ======================//
     viewResultsBtn.addEventListener('click', () => {
-      window.location.href = '/results_page'
+      if (!DATASET_ID) {
+        alert('Please upload and process a dataset first!');
+        return;
+    }
+      window.location.href = `/results_page?datasetId=${DATASET_ID}`
+      //window.location.href = '/results_page'
     })
 
     //==================== HELPER FUNCTIONS ====================//    

@@ -274,7 +274,28 @@
   </div>
 
   <script>
-    let datasetId = '691f886f6ab787a4233128d4'
+    function getDatasetId() {
+      // First, try to get from URL query parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlDatasetId = urlParams.get('datasetId');
+      
+      if (urlDatasetId) {
+          // Save to sessionStorage for future use
+          sessionStorage.setItem('DATASET_ID', urlDatasetId);
+          return urlDatasetId;
+      }
+      
+      // If not in URL, try sessionStorage
+      const storedDatasetId = sessionStorage.getItem('DATASET_ID');
+      if (storedDatasetId) {
+          return storedDatasetId;
+      }
+      
+      // No datasetId found
+      return null;
+  }
+
+let datasetId = getDatasetId();
 
     async function loadHeatmap(datasetId) {
 

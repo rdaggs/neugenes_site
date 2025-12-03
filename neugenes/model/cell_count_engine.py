@@ -80,8 +80,11 @@ def process(base_dir,
     
     structure_weights = update_structure_weights(result)
     calibrated_result = calibrate_expression(result,structure_weights,stabilizing_parameter=0.3)
+    #==================ISOLATE NORMALIZATION AS OWN FUNCTION==================#
     to_csv(calibrated_result,fn_2,acronym_map = config.acronym_map)
-    plot_brain_region_histogram(fn_2,structure_acronymns)
+    #=========================================================================#
+
+    # plot_brain_region_histogram(fn_2,structure_acronymns)
     return result
 
 if __name__ == "__main__":
