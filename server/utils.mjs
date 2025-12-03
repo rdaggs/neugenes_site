@@ -6,8 +6,10 @@ import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { connectDatabase, createDataset, Dataset, ImageAttr, storeImage } from './db.mjs'
+import { processDataset } from './processing-handler.mjs'
 
 dotenv.config()
+
 
 // directory setup
 const __filename = fileURLToPath(import.meta.url)
@@ -20,6 +22,14 @@ const HEATMAP_GENERATOR = path.join(__dirname, '../neugenes/manual-heatmap')
 const IMG_UPLOAD_CEILING = APP_CONFIG?.MAX_FILES || 25
 const IMG_MAX = APP_CONFIG?.MAX_SIZE_MB || 256
 const PORT = process.env.port || 3000
+
+// processing handler
+const processingHandler = new ProcessingHandler({
+    useAWS: process.env.USE_AWS_PROCESSING === 'true',
+    ec2ApiUrl: process.env.EC2_API_URL,
+    pythonPath: process.env.PYTHON_PATH || 'python3',
+    scriptPath: path.join(__dirname, 'process_deepslice.py')
+})
 
 
 export async function generateHeatmap(datasetId) {
@@ -160,5 +170,49 @@ export async function generateHistogram(datasetId, raw = true, params) {
     catch (error) {
         console.error('error in generateHistogram:', error)
         throw error
+    }
+}
+
+export async function Process(dataset, images, bucket) {
+    try {
+        console.log(`starting processing for dataset ${dataset._id}`)
+
+        const outputDir = path.join(DATASET_PROCESSED_DIR, dataset._id.toString())
+        if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true })
+        }
+
+        const result = await processingHandler.process(
+            images,
+            dataset.parameters,
+            outputDir,
+            bucket
+        )
+
+
+        if (result.success) {
+            // Update dataset with results
+            await Dataset.findByIdAndUpdate(dataset._id, {
+                status: 'completed',
+                'results.completedAt': new Date(),
+                'results.processedImageCount': result.image_count,
+                'results.resultsFile': result.results_file || path.join(outputDir, 'deepslice_results.json')
+            })
+
+            console.log(`Dataset ${dataset._id} processed successfully`)
+        } else {
+            throw new Error(result.error || 'Processing failed')
+        }
+    }
+
+    catch (error) {
+
+        console.error(`Failed to process dataset ${dataset._id}:`, error)        
+        await Dataset.findByIdAndUpdate(dataset._id, {
+            status: 'failed',
+            'results.error': error.message,
+            'results.failedAt': new Date()
+        })
+
     }
 }

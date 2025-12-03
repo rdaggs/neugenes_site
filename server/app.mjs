@@ -2,8 +2,6 @@
 import express from 'express'
 import mongoose from 'mongoose'
 import multer from 'multer'
-import { GridFSBucket } from 'mongodb'
-import { spawn } from 'child_process'
 import dotenv from 'dotenv'
 import path from 'path'
 import fs from 'fs'
@@ -11,8 +9,7 @@ import { fileURLToPath } from 'url'
 
 // custom functions
 import { APP_CONFIG } from '../config.mjs'
-import { processDataset } from './processor.mjs'
-import { generateHeatmap,generateHistogram } from './utils.mjs'
+import { generateHeatmap,generateHistogram, Process } from './utils.mjs'
 import { connectDatabase, Dataset, ImageAttr, storeImage } from './db.mjs'
 
 
@@ -24,17 +21,16 @@ const app = express()
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// connect to MongoDB for gridfs file storage 
+// import database utility
 const conn = await mongoose.connect(process.env.MONGO_URI)
 const db = conn.connection
 const bucket = new mongoose.mongo.GridFSBucket(db.db, { bucketName: 'uploads' })
 console.log('mongoDB connected and GridFS ready')
 const upload = multer({ dest: path.join(__dirname, 'uploads/') })
 
-// import database utility
 
 // invoke connection to database
-await connectDatabase();
+await connectDatabase()
 
 
 // directory setup
@@ -257,8 +253,6 @@ app.post('/accept_dataset_parameters', async (req, res) => {
 })
 
 app.post('/process_dataset', async (req, res) => {
-
-
     try {
         const { datasetId } = req.body
 
@@ -294,10 +288,7 @@ app.post('/process_dataset', async (req, res) => {
             status: 'processing',
             'results.startedAt': new Date()
         })
-
-        //===================BRAIN PROCESSING===================// 
-        processDataset(datasetId)
-        //======================================================// 
+        
         res.json({
             success: true,
             message: 'Dataset processing started',
@@ -305,6 +296,11 @@ app.post('/process_dataset', async (req, res) => {
             imageCount: images.length,
             parameters: dataset.parameters
         })
+        //===================BRAIN PROCESSING===================// 
+        // Process(dataset, images, bucket).catch(err => {console.error('Background processing error:', err)})
+        //======================================================// 
+        
+        
 
     }
 
