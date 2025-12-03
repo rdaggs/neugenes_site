@@ -1,19 +1,11 @@
-The content below is an example project proposal / requirements document. Replace the text below the lines marked "__TODO__" with details specific to your project. Remove the "TODO" lines.
-
-(__TODO__: your project name)
-
-# Shoppy Shoperson 
-
 ## Overview
 
-I want to build a web app that hosts my own Neuroscience project. 
+I want to build an interactive platform to visualize neural and genetic data from deep-learning alignment models from my own Neuroscience project. 
 It will allow users to dump in their full brain datasets, and be served a digestible visual result after being processed. 
 
 
 ## Data Model
 Users can have each slice of their brain dataset receive equal attention 
-
-(__TODO__: sample documents)
 
 An Example User:
 
@@ -85,25 +77,8 @@ Home Page
     ├── Edit Artwork
     └── Manage Collections
 
-## User Stories or Use Cases
-
-(__TODO__: write out how your application will be used through [user stories](http://en.wikipedia.org/wiki/User_story#Format) and / or [use cases](https://en.wikipedia.org/wiki/Use_case))
-1. **As a musician**, I want to upload my sounds with descriptions so that potential clients can see my portfolio
-2. **As a photographer**, I want to set my photos into collections (e.g., "Weddings," "Nature") so that visitors can easily browse specific types of work
-3. **As a design student**, I want to tag my projects with keywords so that they're discoverable when people want to hire me
-4. **As an art fan**, I want to browse different artists' portfolios so that I can find inspiration
-5. **As a visitor**, I want to comment on artwork so that I can give feedback to the artist
-6. **As an artist**, I want to see how many likes my artwork gets so that I know which pieces resonate with viewers
-7. **As a user**, I want to edit or delete my artwork so that I can keep my portfolio up-to-date
-8. **As an illustrator**, I want to display my social media links on my profile so that people can follow me on other platforms
-9. **As a visitor**, I want to search for specific styles or mediums (e.g., "watercolor portraits") so that I can find relevant artwork
-10. **As an artist**, I want a dashboard to manage all my content in one place so that portfolio maintenance is efficient
-
 
 ## Research Topics
-
-(__TODO__: the research topics that you're planning on working on along with their point values... and the total points of research topics listed)
-
 
 Integrate user authentication with Passport.js
 * Same as hw6
@@ -134,13 +109,9 @@ VUE.js
 10 points total out of 8 required points (___TODO__: addtional points will __not__ count for extra credit)
 
 
-## [Link to Initial Main Project File](app.mjs) 
+##  References Used
 
-(__TODO__: create a skeleton Express application with a package.json, app.mjs, views folder, etc. ... and link to your initial app.mjs)
 
-## Annotations / References Used
-
-(__TODO__: list any tutorials/references/etc. that you've based your code off of)
 
 1. [Express.js Documentation](https://expressjs.com/) - Basic Express application structure and middleware setup
 2. [Mongoose Documentation](https://mongoosejs.com/docs/guide.html) - Schema design and MongoDB connection
