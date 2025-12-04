@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url'
 
 // custom functions
 import { APP_CONFIG } from '../config.mjs'
-import { generateHeatmap,generateHistogram, Process } from './utils.mjs'
+import { generateHeatmap, generateHistogram, ParseParameters } from './utils.mjs'
 import { connectDatabase, Dataset, ImageAttr, storeImage } from './db.mjs'
 
 
@@ -197,7 +197,6 @@ app.post('/accept_dataset_parameters', async (req, res) => {
             ring_width,
             z_threshold
         } = req.body
-        console.log('accepting parameters for', datasetId)
 
         if (!datasetId) {
             return res.status(400).json({
@@ -214,7 +213,6 @@ app.post('/accept_dataset_parameters', async (req, res) => {
                 error: 'Dataset not found'
             })
         }
-
 
         // quick validation
         if (!experiment_name || !structure_acronymns) {
@@ -233,8 +231,14 @@ app.post('/accept_dataset_parameters', async (req, res) => {
             ring_width: parseInt(ring_width) || 3,
             z_threshold: parseFloat(z_threshold) || 1.2
         }
+
+        // parameter parsing logic 
+        console.log('parameter',parameters)
+        const parsed_parameters = ParseParameters(parameters)
+
+
         await Dataset.findByIdAndUpdate(datasetId, {
-            parameters: parameters
+            parameters: parsed_parameters
         })
         console.log(`Dataset created: ${dataset._id}`);
 
@@ -254,7 +258,7 @@ app.post('/accept_dataset_parameters', async (req, res) => {
 
 app.post('/accept_renorm_parameters', async (req, res) => {
 
-    
+
     try {
         const {
             datasetId,
@@ -347,7 +351,7 @@ app.post('/process_dataset', async (req, res) => {
             status: 'processing',
             'results.startedAt': new Date()
         })
-        
+
         res.json({
             success: true,
             message: 'Dataset processing started',
@@ -356,10 +360,24 @@ app.post('/process_dataset', async (req, res) => {
             parameters: dataset.parameters
         })
         //===================BRAIN PROCESSING===================// 
-        // Process(dataset, images, bucket).catch(err => {console.error('Background processing error:', err)})
+        Process(dataset, images, bucket)
+            .then(async () => {
+                await Dataset.findByIdAndUpdate(datasetId, {
+                    status: 'completed',
+                    'results.completedAt': new Date()
+                })
+                console.log(`processing completed for dataset ${datasetId}`)
+            })
+            .catch(async (err) => {
+                console.error('background processing error:', err)
+                await Dataset.findByIdAndUpdate(datasetId, {
+                    status: 'failed',
+                    'results.error': err.message
+                })
+            })
         //======================================================// 
-        
-        
+
+
 
     }
 
@@ -369,6 +387,25 @@ app.post('/process_dataset', async (req, res) => {
             success: false,
             error: error.message
         })
+    }
+})
+
+app.get('/api/dataset_status/:datasetId', async (req, res) => {
+    try {
+        const { datasetId } = req.params
+        const dataset = await Dataset.findById(datasetId)
+
+        if (!dataset) {
+            return res.status(404).json({ success: false, error: 'Dataset not found' })
+        }
+
+        res.json({
+            success: true,
+            status: dataset.status, // 'pending', 'processing', 'completed', 'failed'
+            results: dataset.results
+        })
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message })
     }
 })
 
@@ -529,7 +566,7 @@ app.get('/api/histogram_norm', async (req, res) => {
 
         // generate histogram
         //=============================ACCEPT RENORMALIZING PARAMS=============================//
-        const temp_renormalizing = {'z_score': 2}
+        const temp_renormalizing = { 'z_score': 2 }
         //====================================================================================//
         const result = await generateHistogram(datasetId, false, temp_renormalizing)
         const relativePath = path.relative(DATASET_PROCESSED_DIR, dataset.results.histogramNormPath)

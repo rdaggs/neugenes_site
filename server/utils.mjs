@@ -1,14 +1,14 @@
 //utils.mjs
-import { APP_CONFIG } from '../config.mjs';
+import { APP_CONFIG, STRUCTURE_ID_TO_ACRONYM } from '../config.mjs';
 import { spawn } from 'child_process'
 import dotenv from 'dotenv'
 import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
-import { connectDatabase, createDataset, Dataset, ImageAttr, storeImage } from './db.mjs'
-import { processDataset } from './processing-handler.mjs'
+import { Dataset} from './db.mjs'
 
 dotenv.config()
+
 
 
 // directory setup
@@ -24,13 +24,6 @@ const IMG_UPLOAD_CEILING = APP_CONFIG?.MAX_FILES || 25
 const IMG_MAX = APP_CONFIG?.MAX_SIZE_MB || 256
 const PORT = process.env.port || 3000
 
-// processing handler
-const processingHandler = new ProcessingHandler({
-    useAWS: process.env.USE_AWS_PROCESSING === 'true',
-    ec2ApiUrl: process.env.EC2_API_URL,
-    pythonPath: process.env.PYTHON_PATH || 'python3',
-    scriptPath: path.join(__dirname, 'process_deepslice.py')
-})
 
 
 export async function generateHeatmap(datasetId) {
@@ -177,48 +170,65 @@ export async function generateHistogram(datasetId, raw = true, params) {
         throw error
     }
 }
-
-export async function Process(dataset, images, bucket) {
+export async function ParseParameters(params) {
     try {
-        console.log(`starting processing for dataset ${dataset._id}`)
+        console.log('=== ParseParameters called ===')
+        console.log('params:', params)
+        
+        const parsed = { ...params }
 
-        const outputDir = path.join(DATASET_PROCESSED_DIR, dataset._id.toString())
-        if (!fs.existsSync(outputDir)) {
-            fs.mkdirSync(outputDir, { recursive: true })
-        }
+        // Convert structure IDs to acronyms
+        if (params.structure_acronymns && params.structure_acronymns.length > 0) {
+            console.log('Input structure IDs:', params.structure_acronymns)
+            console.log('First 5 IDs:', params.structure_acronymns.slice(0, 5))
+            
+            parsed.structure_acronyms = params.structure_acronymns
+                .map(id => STRUCTURE_ID_TO_ACRONYM[String(id)])
+                .filter(acronym => acronym !== undefined);
 
-        const result = await processingHandler.process(
-            images,
-            dataset.parameters,
-            outputDir,
-            bucket
-        )
+            console.log(`Mapped ${parsed.structure_acronyms.length} out of ${params.structure_acronymns.length} structure IDs`);
 
-
-        if (result.success) {
-
-            // update dataset with results 
-            await Dataset.findByIdAndUpdate(dataset._id, {
-                status: 'completed',
-                'results.completedAt': new Date(),
-                'results.processedImageCount': result.image_count,
-                'results.resultsFile': result.results_file || path.join(outputDir, 'deepslice_results.json')
-            })
-
-            console.log(`Dataset ${dataset._id} processed successfully`)
+            if (parsed.structure_acronyms.length === 0) {
+                console.warn('No valid structure IDs found, defaulting to root');
+                parsed.structure_acronyms = ['root'];
+            }
+            
+            console.log('Converted to acronyms:', parsed.structure_acronyms)
+            
         } else {
-            throw new Error(result.error || 'Processing failed')
+            parsed.structure_acronyms = ['root']
         }
-    }
 
-    catch (error) {
+        // Validate numeric parameters
+        if (parsed.threshold_scale < 0 || parsed.threshold_scale > 10) {
+            console.warn('Invalid threshold_scale, using default 1.0')
+            parsed.threshold_scale = 1.0
+        }
 
-        console.error(`Failed to process dataset ${dataset._id}:`, error)        
-        await Dataset.findByIdAndUpdate(dataset._id, {
-            status: 'failed',
-            'results.error': error.message,
-            'results.failedAt': new Date()
-        })
+        if (parsed.patch_size < 1 || parsed.patch_size > 20) {
+            console.warn('Invalid patch_size, using default 7')
+            parsed.patch_size = 7
+        }
 
+        if (parsed.ring_width < 1 || parsed.ring_width > 10) {
+            console.warn('Invalid ring_width, using default 3')
+            parsed.ring_width = 3
+        }
+
+        // Ensure exactly one mode is selected
+        if (!parsed.dot_count && !parsed.expression_intensity) {
+            console.warn('No analysis mode selected, defaulting to dot_count')
+            parsed.dot_count = true
+        } else if (parsed.dot_count && parsed.expression_intensity) {
+            console.warn('Both modes selected, defaulting to dot_count')
+            parsed.expression_intensity = false
+        }
+
+        console.log('Final structure_acronyms:', parsed.structure_acronyms)
+        return parsed
+
+    } catch (error) {
+        console.error('Error parsing parameters:', error)
+        throw error
     }
 }
