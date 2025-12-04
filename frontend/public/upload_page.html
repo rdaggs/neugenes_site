@@ -751,11 +751,11 @@
 
     //==================== PROCESS FUNCTION ====================//
     processDatasetBtn.addEventListener('click', async () => {
-      //processDatasetBtn.disabled = true
-      showStatus(processStatus, 'running algorithm...', 'info')
+      processDatasetBtn.disabled = true
+      showStatus(processStatus, 'Starting processing...', 'info')
 
       try {
-
+        // Start the processing
         const res = await fetch('/process_dataset', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -764,25 +764,18 @@
 
         const data = await res.json()
 
-        console.log('res status', res.status)
-        console.log('res ok', res.ok)
-
-        if (data.success) {
-          showStatus(processStatus, `Processing complete: ${data.message}. Redirecting...`, 'success')
-
-          // redirect to results page after processing is complete to view output
-          setTimeout(() => {
-            window.location.href = `/results_page?datasetId=${DATASET_ID}`
-          }, 1500)
-        }
-        else {
+        if (!data.success) {
           showStatus(processStatus, `Error: ${data.error}`, 'error')
+          processDatasetBtn.disabled = false
+          return
         }
-      }
-      catch (error) {
+
+        // Start polling for completion
+        showStatus(processStatus, 'Processing in progress...', 'info')
+        await pollProcessingStatus()
+
+      } catch (error) {
         showStatus(processStatus, `Processing failed: ${error.message}`, 'error')
-      }
-      finally {
         processDatasetBtn.disabled = false
       }
     })
@@ -939,6 +932,48 @@
     function getSelectedStructureIds() {
       return Array.from(selectedStructureIds);
     }
+
+    async function pollProcessingStatus() {
+      const pollInterval = 2000 // Check every 2 seconds
+      
+      while (true) {
+        try {
+          const res = await fetch(`/api/dataset_status/${DATASET_ID}`)
+          const data = await res.json()
+
+          if (!data.success) {
+            showStatus(processStatus, `Error checking status: ${data.error}`, 'error')
+            processDatasetBtn.disabled = false
+            break
+          }
+
+          console.log('Current status:', data.status)
+
+          if (data.status === 'completed') {
+            showStatus(processStatus, 'Processing complete! Redirecting...', 'success')
+            setTimeout(() => {
+              window.location.href = `/results_page?datasetId=${DATASET_ID}`
+            }, 1000)
+            break
+          } 
+          else if (data.status === 'failed') {
+            showStatus(processStatus, `Processing failed: ${data.results?.error || 'Unknown error'}`, 'error')
+            processDatasetBtn.disabled = false
+            break
+          }
+          else if (data.status === 'processing') {
+            showStatus(processStatus, 'Processing... Please wait.', 'info')
+          }
+
+          // Wait before next poll
+          await new Promise(resolve => setTimeout(resolve, pollInterval))
+          
+        } catch (error) {
+          showStatus(processStatus, `Status check failed: ${error.message}`, 'error')
+          processDatasetBtn.disabled = false
+          break
+        }
+      }
 
     // Initialize
     loadBrainStructures();

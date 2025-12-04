@@ -376,9 +376,6 @@ app.post('/process_dataset', async (req, res) => {
                 })
             })
         //======================================================// 
-
-
-
     }
 
     catch (error) {
@@ -596,8 +593,6 @@ app.get('/config', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`server running on port ${PORT}`)
-    console.log('Initializing application...')
-    console.log('Root directory:', ROOT_DIR)
-    console.log('Dataset directory:', DATASET_DIR)
-    console.log('Model path:', MODEL_PATH)
+    console.log('initializing application...')
+    console.log('root directory:', ROOT_DIR)
 })
