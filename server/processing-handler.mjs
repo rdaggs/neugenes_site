@@ -57,7 +57,7 @@ export class ProcessingHandler {
 
     // process dataset using AWS 
     async processOnAWS(images,parameters,bucket){
-        
+
 
     }
 
@@ -77,5 +77,4 @@ export class ProcessingHandler {
 
 
 
-    }
 }
