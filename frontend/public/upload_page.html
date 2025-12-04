@@ -111,24 +111,30 @@
     li {
       margin: 5px 0;
       text-align: left;
-      /* Force text alignment to the left */
     }
-
-
 
     /* Checkbox styles */
     li input[type="checkbox"] {
       margin-right: 5px;
-      /* Add space between checkbox and text */
     }
 
+    #brainStructureTree li span.toggle {
+      color: #075058;
+      padding: 2px 4px;
+      border-radius: 3px;
+    }
+
+    #brainStructureTree li span.toggle:hover {
+      background-color: #eafdff;
+    }
 
     input {
       border-radius: 0px;
       margin-left: 0.5rem;
       border: 2px solid #c392b2;
       margin-bottom: 0.5rem;
-
+      padding: 4px;
+      border-radius: 2px;
     }
 
     .param-section {
@@ -138,7 +144,6 @@
       padding-left: 1rem;
       align-items: right;
       gap: 8px;
-      /* spacing between label + radio */
       margin-bottom: 6px;
 
     }
@@ -250,19 +255,12 @@
       margin-top: 30px;
     }
 
-    .params-grid {
-      display: grid;
-      grid-template-columns: 160px 120px;
-      /* label column | input column */
-      row-gap: 12px;
-      column-gap: 10px;
-      align-items: center;
-    }
+
 
     .params-grid input[type="number"],
     .params-grid input[type="text"],
     .params-grid input[type="radio"] {
-      width: 100px;
+      width: 200px;
     }
 
     .param-item {
@@ -274,6 +272,46 @@
       text-align: right;
       padding-right: 8px;
     }
+
+    .params-grid {
+      display: grid;
+      grid-template-columns: 200px 200px;
+      /* label column | input column */
+      row-gap: 12px;
+      /* more breathing room between rows */
+      column-gap: 24px;
+      align-items: start;
+      margin-left: 2rem;
+    }
+
+    .param-item {
+      display: contents;
+      /* keeps grid structure for label + input pairing */
+    }
+
+    .param-item label {
+      font-weight: 600;
+      color: #075058;
+      text-align: left;
+      padding-right: 8px;
+      line-height: 1.1;
+    }
+
+    .param-desc {
+      grid-column: 1 / 2;
+      /* stays under label column */
+      font-size: 0.8rem;
+      color: #555;
+      margin-top: 0px;
+      margin-bottom: 0px;
+      text-align: left;
+      opacity: 0.8;
+    }
+
+    .param-item input {
+      width: 200px;
+    }
+
 
     /* Make sure sections stretch full width of each column */
     .left-col>div,
@@ -290,6 +328,50 @@
     .view-results {
       margin-top: 50px;
       text-align: center;
+    }
+
+    .params-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      margin-left: 2rem;
+      margin-top: 2rem;
+    }
+
+    .param-item {
+      display: grid;
+      grid-template-columns: 260px 220px;
+      /* left = label+desc, right = input */
+      column-gap: 24px;
+      align-items: flex-start;
+    }
+
+    .param-label {
+      text-align: left;
+    }
+
+    .param-label label {
+      font-weight: 600;
+      color: #075058;
+      line-height: 1.1;
+    }
+
+    .param-desc {
+      font-size: 0.8rem;
+      color: #555;
+      opacity: 0.8;
+      margin-top: 2px;
+    }
+
+    .param-item input[type="text"],
+    .param-item input[type="number"] {
+      width: 220px;
+    }
+
+    /* left-align radios nicely */
+    .param-item input[type="radio"] {
+      justify-self: flex-start;
+      margin-top: 4px;
     }
   </style>
 </head>
@@ -310,7 +392,7 @@
         <button id="uploadBtn" style="display: none">Upload All Images</button>
         <p id="statusMultiple" class="status"></p>
       </div>
-      
+
       <!-- Processing -->
       <div class="upload-section">
         <h2>Run Dataset Processing</h2>
@@ -326,7 +408,10 @@
         <h2>Dataset Parameters</h2>
         <div class="params-grid">
           <div class="param-item">
-            <label for="experimentName">Experiment Name</label>
+            <div class="param-label">
+              <label for="experimentName">Experiment Name</label>
+              <div class="param-desc">Name or identifier for this dataset.</div>
+            </div>
             <input type="text" id="baseDir" placeholder="Npsr1 GFP Mouse 1-- July 30">
           </div>
           <!-- <div class="param-item">
@@ -334,33 +419,53 @@
             <input type="text" id="structureAcronyms" placeholder="FULL_BRAIN">
           </div> -->
           <div class="param-item">
-            <label for="dotCount">Dot Count</label>
+            <div class="param-label">
+              <label for="dotCount">Dot Count</label>
+              <div class="param-desc">Dot count refers to</div>
+            </div>
             <input type="radio" id="dotCount" onchange="handleCheckbox(this, 'expressionIntensity')">
           </div>
           <div class="param-item">
 
-            <label for="expressionIntensity">Expression Intensity</label>
+            <div class="param-label">
+              <label for="expressionIntensity">Expression Intensity</label>
+              <div class="param-desc">Expression intensity refers to</div>
+            </div>
             <input type="radio" id="expressionIntensity" onchange="handleCheckbox(this, 'dotCount')">
-
           </div>
           <div class="param-item">
-            <label for="thresholdScale">Threshold Scale</label>
+            <div class="param-label">
+              <label for="thresholdScale">Threshold Scale</label>
+              <div class="param-desc">Threshold scale refers to</div>
+            </div>
             <input type="number" step="0.1" id="thresholdScale" value="1.0">
           </div>
           <div class="param-item">
-            <label for="layerInTiff">Layer in TIFF</label>
+            <div class="param-label">
+              <label for="layerInTiff">Layer in TIFF</label>
+              <div class="param-desc">Layer in TIFF refers to</div>
+            </div>
             <input type="number" id="layerInTiff" value="1">
           </div>
           <div class="param-item">
-            <label for="patchSize">Patch Size</label>
+            <div class="param-label">
+              <label for="patchSize">Patch Size</label>
+              <div class="param-desc">Patch size refers to</div>
+            </div>
             <input type="number" id="patchSize" value="7">
           </div>
           <div class="param-item">
-            <label for="ringWidth">Ring Width</label>
+            <div class="param-label">
+              <label for="ringWidth">Ring Width</label>
+              <div class="param-desc">Ring width refers to</div>
+            </div>
             <input type="number" id="ringWidth" value="3">
           </div>
           <div class="param-item">
-            <label for="zThreshold">Z Threshold</label>
+            <div class="param-label">
+              <label for="zThreshold">Z Threshold</label>
+              <div class="param-desc">Z threshold refers to</div>
+            </div>
             <input type="number" step="0.1" id="zThreshold" value="1.2">
           </div>
         </div>
@@ -368,7 +473,7 @@
         <p id="paramsStatus" class="status"></p>
       </div>
       <div class="param-section">
-        <h2>Select Brain Structures</h2>
+        <h2>Select Brain Structures (Click to Expand)</h2>
         <div id="brainStructureTree"></div>
         <p id="structureStatus" class="status"></p>
 
@@ -401,7 +506,7 @@
     const processDatasetBtn = document.getElementById('processDatasetBtn')  // ADD THIS LINE
     const processStatus = document.getElementById('processStatus')  // ADD THIS LINE
 
-  
+
 
     // opens users file system to select files
     dropZoneMultiple.addEventListener('click', () => fileInputMultiple.click())
@@ -556,7 +661,7 @@
     }
 
     uploadBtn.addEventListener('click', async () => {
-      
+
       // setup
       if (selectedFiles.length === 0) return
       const formData = new FormData()
@@ -569,11 +674,11 @@
       if (DATASET_ID && DATASET_ID !== 'undefined' && DATASET_ID !== 'null') {
         console.log('Using existing datasetId:', DATASET_ID)
         formData.append('datasetId', DATASET_ID);
-      } 
-      else {console.log('no datasetId - will create new dataset')}
+      }
+      else { console.log('no datasetId - will create new dataset') }
 
       // add username to form data
-      formData.append('createdBy', USERNAME)    
+      formData.append('createdBy', USERNAME)
       uploadBtn.disabled = true
       showStatus(statusMultiple, `Uploading ${selectedFiles.length} files to database...`, 'info')
 
@@ -617,7 +722,7 @@
 
     saveParamsButton.addEventListener('click', async () => {
       const payload = {
-        datasetId:  DATASET_ID,
+        datasetId: DATASET_ID,
         experiment_name: document.getElementById('baseDir').value,
         structure_acronymns: Array.from(selectedStructureIds),
         selected_structure_ids: getSelectedStructureIds(),   // <-- ADDED
@@ -687,7 +792,7 @@
       if (!DATASET_ID) {
         alert('Please upload and process a dataset first!');
         return;
-    }
+      }
       window.location.href = `/results_page?datasetId=${DATASET_ID}`
       //window.location.href = '/results_page'
     })
@@ -706,132 +811,139 @@
     }
     /* ===================== BRAIN STRUCTURE TREE LOGIC ===================== */
 
-    // Example hierarchy (you can replace with full Allen hierarchy from backend)
-    const brainTreeData = {
-      id: 997,
-      name: "root",
-      acronym: "root",
-      checked: false,
-      children: [
-        {
-          id: 8,
-          name: "Basic cell groups and regions",
-          acronym: "grey",
-          checked: false,
-          children: [
-            {
-              id: 567,
-              name: "Cerebrum",
-              acronym: "CH",
-              checked: false,
-              children: []
-            },
-            {
-              id: 343,
-              name: "Brain stem",
-              acronym: "BS",
-              checked: false,
-              children: []
-            },
-            {
-              id: 512,
-              name: "Cerebellum",
-              acronym: "CB",
-              checked: false,
-              children: []
-            }
-          ]
-        },
-        {
-          id: 1009,
-          name: "fiber tracts",
-          acronym: "fiber tracts",
-          checked: false,
-          children: []
-        },
-        {
-          id: 73,
-          name: "ventricular systems",
-          acronym: "VS",
-          checked: false,
-          children: []
-        }
-      ]
-    };
+    /* ===================== BRAIN STRUCTURE TREE LOGIC ===================== */
 
     let expandedNodes = new Set();
     let selectedStructureIds = new Set();
+    let brainTreeData = null;
 
-    /* ---------- Create a single node ---------- */
+    // Load the full structure hierarchy from JSON
+    async function loadBrainStructures() {
+      try {
+        const res = await fetch("structures.json");
+        const data = await res.json();
+
+        // Convert flat array into a nested tree
+        brainTreeData = buildHierarchy(data);
+        renderBrainTree();
+      } catch (error) {
+        console.error("Error loading structures.json:", error);
+        document.getElementById("brainStructureTree").innerText =
+          "Error loading brain structures.";
+      }
+    }
+
+    // Build hierarchical tree from structure_id_path arrays
+    function buildHierarchy(flatData) {
+      const idToNode = {};
+      let root = null;
+
+      // First, create all nodes
+      flatData.forEach((item) => {
+        idToNode[item.id] = {
+          id: item.id,
+          name: item.name,
+          acronym: item.acronym,
+          checked: false,
+          children: []
+        };
+      });
+
+      // Then, link parents and children using structure_id_path
+      flatData.forEach((item) => {
+        const path = item.structure_id_path;
+        if (path.length === 1) {
+          root = idToNode[item.id];
+        } else {
+          const parentId = path[path.length - 2];
+          if (idToNode[parentId]) {
+            idToNode[parentId].children.push(idToNode[item.id]);
+          }
+        }
+      });
+
+      return root;
+    }
+
+    // Recursive node creation
     function createTreeNode(node) {
       const li = document.createElement("li");
       li.id = `node-${node.id}`;
 
-      // Checkbox
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
       checkbox.checked = node.checked;
+
+      // Toggle selection, including nested children
       checkbox.addEventListener("change", () => {
         node.checked = checkbox.checked;
-
-        if (checkbox.checked) {
-          selectedStructureIds.add(node.id);
-        } else {
-          selectedStructureIds.delete(node.id);
-        }
+        toggleChildren(node, checkbox.checked);
+        updateSelectedIds(node, checkbox.checked);
+        renderBrainTree(); // re-render so descendants update visually
       });
       li.appendChild(checkbox);
 
-      // Expand toggle text
       const label = document.createElement("span");
       label.className = "toggle";
       label.style.cursor = "pointer";
-      label.style.color = "blue";
-      label.style.textDecoration = "underline";
-      label.innerHTML = `<strong>${node.name}</strong> (ID: ${node.id}, Acronym: ${node.acronym})`;
+      label.innerHTML = `<strong>${node.name}</strong> (${node.acronym})`;
 
       label.addEventListener("click", () => {
         if (expandedNodes.has(node.id)) expandedNodes.delete(node.id);
         else expandedNodes.add(node.id);
-
         renderBrainTree();
       });
 
       li.appendChild(label);
 
-      // Render children only if expanded
       if (node.children && node.children.length > 0 && expandedNodes.has(node.id)) {
         const ul = document.createElement("ul");
         ul.style.paddingLeft = "20px";
-
-        node.children.forEach(child => {
+        node.children.forEach((child) => {
           ul.appendChild(createTreeNode(child));
         });
-
         li.appendChild(ul);
       }
 
       return li;
     }
 
-    /* ---------- Render full tree ---------- */
+    // Recursive helper to toggle all children
+    function toggleChildren(node, isChecked) {
+      if (!node.children) return;
+      node.children.forEach((child) => {
+        child.checked = isChecked;
+        toggleChildren(child, isChecked);
+      });
+    }
+
+    // Recursive helper to update selected IDs
+    function updateSelectedIds(node, isChecked) {
+      if (isChecked) selectedStructureIds.add(node.id);
+      else selectedStructureIds.delete(node.id);
+
+      if (node.children) {
+        node.children.forEach((child) => updateSelectedIds(child, isChecked));
+      }
+    }
+
+    // Render the full tree
     function renderBrainTree() {
       const container = document.getElementById("brainStructureTree");
-      container.innerHTML = ""; // clear old
-
+      container.innerHTML = "";
+      if (!brainTreeData) return;
       const ul = document.createElement("ul");
       ul.appendChild(createTreeNode(brainTreeData));
-
       container.appendChild(ul);
     }
 
-    /* Initial render */
-    renderBrainTree();
-
-    /* Expose selected structures when saving parameters */
+    // Helper for saving parameters
     function getSelectedStructureIds() {
       return Array.from(selectedStructureIds);
     }
+
+    // Initialize
+    loadBrainStructures();
   </script>
 </body>
 
