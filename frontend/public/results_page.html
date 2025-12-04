@@ -400,10 +400,9 @@ let datasetId = getDatasetId();
       const reprocessStatus = document.getElementById('reprocessStatus')
 
       const payload = {
+        datasetId: DATASET_ID,
         remove_top_n: parseFloat(document.getElementById('removeTopN').value),
         normalizationStrength: parseInt(document.getElementById('normalizationStrength').value),
-        patch_size: parseInt(document.getElementById('patchSize').value),
-        ring_width: parseInt(document.getElementById('ringWidth').value),
         normType: parseFloat(document.getElementById('normType').value)
       }
 
@@ -412,7 +411,7 @@ let datasetId = getDatasetId();
         showStatus(reprocessStatus, 'Saving parameters and reprocessing...', 'info')
 
         // Save parameters
-        const saveRes = await fetch('/accept_dataset_parameters', {
+        const saveRes = await fetch('/accept_renorm_parameters', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -423,22 +422,8 @@ let datasetId = getDatasetId();
           throw new Error(saveData.error || 'Failed to save parameters')
         }
 
-        // Trigger reprocessing
-        const processRes = await fetch('/process_dataset', { method: 'POST' })
-        const processData = await processRes.json()
-
-        if (processData.success) {
-          showStatus(reprocessStatus, 'Reprocessing complete! Reloading...', 'success')
-
-          // Reload the page to show new results
-          setTimeout(() => {
-            window.location.reload()
-          }, 1500)
-        } else {
-          throw new Error(processData.error || 'Processing failed')
-        }
-
-      } catch (error) {
+      } 
+      catch (error) {
         showStatus(reprocessStatus, `Error: ${error.message}`, 'error')
         console.error('Reprocess error:', error)
       } finally {

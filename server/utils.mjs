@@ -18,7 +18,8 @@ const ROOT_DIR = path.join(__dirname, '..')
 const MODEL_PATH = path.join(__dirname, '../neugenes/model')
 const DATASET_DIR = path.join(__dirname, '../neugenes/dataset')
 const DATASET_PROCESSED_DIR = path.join(__dirname, '../neugenes/dataset_processed')
-const HEATMAP_GENERATOR = path.join(__dirname, '../neugenes/manual-heatmap')
+const PROCESSING_SCRIPTS = path.join(__dirname, '../neugenes/processing-scripts')
+const HEATMAP_GENERATOR = path.join(__dirname, '../neugenes/processing-scripts/manual-heatmap')
 const IMG_UPLOAD_CEILING = APP_CONFIG?.MAX_FILES || 25
 const IMG_MAX = APP_CONFIG?.MAX_SIZE_MB || 256
 const PORT = process.env.port || 3000
@@ -165,6 +166,10 @@ export async function generateHistogram(datasetId, raw = true, params) {
 
         return new Promise((resolve, reject) => {
             // python calling of generate_histogram.py
+
+            const histogramProcess = spawn('python', [
+                path.join(PROCESSING_SCRIPTS, 'generate_histogram.py')
+            ])
         })
     }
     catch (error) {
@@ -191,7 +196,8 @@ export async function Process(dataset, images, bucket) {
 
 
         if (result.success) {
-            // Update dataset with results
+
+            // update dataset with results 
             await Dataset.findByIdAndUpdate(dataset._id, {
                 status: 'completed',
                 'results.completedAt': new Date(),

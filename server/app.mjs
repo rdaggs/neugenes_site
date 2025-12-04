@@ -252,6 +252,65 @@ app.post('/accept_dataset_parameters', async (req, res) => {
 
 })
 
+app.post('/accept_renorm_parameters', async (req, res) => {
+
+    
+    try {
+        const {
+            datasetId,
+            remove_top_n,
+            normalizationStrength,
+            normType,
+        } = req.body
+        console.log('accepting re norm parameters for', datasetId)
+
+        if (!datasetId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing datasetId'
+            })
+        }
+
+        // get dataset parameters
+        const dataset = await Dataset.findById(datasetId)
+        if (!dataset) {
+            return res.status(404).json({
+                success: false,
+                error: 'Dataset not found'
+            })
+        }
+
+
+        // store parameters
+        const parameters = {
+            experiment_name,
+            structure_acronymns,
+            dot_count: Boolean(dot_count),
+            expression_intensity: Boolean(expression_intensity),
+            threshold_scale: parseFloat(threshold_scale) || 1.0,
+            layer_in_tiff: parseInt(layer_in_tiff) || 1,
+            patch_size: parseInt(patch_size) || 7,
+            ring_width: parseInt(ring_width) || 3,
+            z_threshold: parseFloat(z_threshold) || 1.2
+        }
+        await Dataset.findByIdAndUpdate(datasetId, {
+            parameters: parameters
+        })
+        console.log(`Dataset created: ${dataset._id}`);
+
+        return res.json({
+            success: true,
+            datasetId: dataset._id
+        })
+
+
+    }
+    catch (err) {
+        console.error('Error parsing renorm parameters:', err)
+        res.status(500).json({ success: false, error: 'Failed to save parameters' })
+    }
+})
+
 app.post('/process_dataset', async (req, res) => {
     try {
         const { datasetId } = req.body
@@ -326,7 +385,6 @@ app.get('/api/result_heatmap', async (req, res) => {
 
     let datasetId = req.query.datasetId
     try {
-        console.log('datasetId on result: ', datasetId)
         //====================================================================//
         if (!datasetId) {
             console.log('no datasetId')
