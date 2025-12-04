@@ -6,7 +6,6 @@ import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { Dataset} from './db.mjs'
-import { connectDatabase, createDataset, Dataset, ImageAttr, storeImage } from './db.mjs'
 import { ProcessingHandler } from './processing-handler.mjs'
 
 dotenv.config()

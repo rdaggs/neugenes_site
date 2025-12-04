@@ -790,285 +790,198 @@
 
     //==================== PROCESS FUNCTION ====================//
     processDatasetBtn.addEventListener('click', async () => {
-      processDatasetBtn.disabled = true
-      showStatus(processStatus, 'Starting processing...', 'info')
+      //processDatasetBtn.disabled = true
+      showStatus(processStatus, 'running algorithm...', 'info')
 
       try {
-        // Start the processing
-        // ===================== PROCESSING =====================
-        let isProcessing = false;
 
-        processBtn.addEventListener('click', async () => {
-          if (!DATASET_ID) {
-            showStatus(processStatus, 'Please upload a dataset first.', 'error');
-            return;
-          }
+        const res = await fetch('/process_dataset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ datasetId: DATASET_ID })
+        })
 
-          if (isProcessing) return;
-          isProcessing = true;
-          processBtn.disabled = true;
-          viewResultsBtn.style.display = 'none';
+        const data = await res.json()
 
-          // Start loading animation
-          loadingContainer.style.display = 'block';
-          loadingBar.style.width = '0%';
-          loadingBar.style.backgroundColor = '#c53b3b';
-          showStatus(processStatus, 'Processing dataset...', 'info');
+        console.log('res status', res.status)
+        console.log('res ok', res.ok)
 
-          // Simulate slower progress (will be replaced with real progress)
-          const progressInterval = simulateProgress();
+        if (data.success) {
+          showStatus(processStatus, `Processing complete: ${data.message}. Redirecting...`, 'success')
 
-          try {
-            const res = await fetch('/process_dataset', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ datasetId: DATASET_ID })
-            });
-            const data = await res.json();
-
-            clearInterval(progressInterval);
-
-            if (data.success) {
-              // Complete the progress bar
-              loadingBar.style.width = '100%';
-              loadingBar.style.backgroundColor = '#026ead';
-              showStatus(processStatus, 'Processing complete!', 'success');
-
-              // Show view results button after completion
-              setTimeout(() => {
-                viewResultsBtn.style.display = 'inline-flex';
-              }, 500);
-            } else {
-              showStatus(processStatus, `Error: ${data.error}`, 'error');
-            }
-          } catch (err) {
-            clearInterval(progressInterval);
-            loadingBar.classList.remove('animating');
-            showStatus(processStatus, `Processing failed: ${err.message}`, 'error');
-          } finally {
-            isProcessing = false;
-            processBtn.disabled = false;
-            const data = await res.json()
-
-            if (!data.success) {
-              showStatus(processStatus, `Error: ${data.error}`, 'error')
-              processDatasetBtn.disabled = false
-              return
-            }
-
-            // Start polling for completion
-            showStatus(processStatus, 'Processing in progress...', 'info')
-            await pollProcessingStatus()
-
-          }
-
-        });
-
-        // Color phases: red -> orange -> lime green -> blue
-        const progressColors = ['#b94920', '#e97435', '#dfec57', '#075058'];
-
-        function simulateProgress() {
-          let progress = 0;
-          const interval = setInterval(() => {
-            // Very slow progress - takes longer to reach each phase
-            const remaining = 92 - progress;
-            const increment = Math.max(0.15, remaining * 0.008);
-            progress = Math.min(92, progress + increment);
-            loadingBar.style.width = `${progress}%`;
-
-            // Change color based on progress phase
-            if (progress < 25) {
-              loadingBar.style.backgroundColor = progressColors[0]; // red
-            } else if (progress < 50) {
-              loadingBar.style.backgroundColor = progressColors[1]; // orange
-            } else if (progress < 75) {
-              loadingBar.style.backgroundColor = progressColors[2]; // lime green
-            } else {
-              loadingBar.style.backgroundColor = progressColors[3]; // blue
-            }
-          }, 300);
-          return interval;
+          // redirect to results page after processing is complete to view output
+          setTimeout(() => {
+            window.location.href = `/results_page?datasetId=${DATASET_ID}`
+          }, 1500)
         }
-
-        viewResultsBtn.addEventListener('click', () => {
-          if (!DATASET_ID) {
-            alert('No dataset to view.');
-            return;
-          }
-          window.location.href = `/results_page?datasetId=${DATASET_ID}`;
-        });
-
-        // ===================== BRAIN STRUCTURE TREE =====================
-        let expandedNodes = new Set();
-        let selectedStructureIds = new Set();
-        let brainTreeData = null;
-
-        async function loadBrainStructures() {
-          try {
-            const res = await fetch('structures.json');
-            const data = await res.json();
-            brainTreeData = buildHierarchy(data);
-            renderBrainTree();
-          } catch (err) {
-            console.error('Error loading structures:', err);
-            document.getElementById('brainStructureTree').innerText = 'Error loading brain structures.';
-          }
+        else {
+          showStatus(processStatus, `Error: ${data.error}`, 'error')
         }
-
-        function buildHierarchy(flatData) {
-          const idToNode = {};
-          let root = null;
-
-          flatData.forEach(item => {
-            idToNode[item.id] = {
-              id: item.id,
-              name: item.name,
-              acronym: item.acronym,
-              checked: false,
-              children: []
-            };
-          });
-
-          flatData.forEach(item => {
-            const path = item.structure_id_path;
-            if (path.length === 1) {
-              root = idToNode[item.id];
-            } else {
-              const parentId = path[path.length - 2];
-              if (idToNode[parentId]) {
-                idToNode[parentId].children.push(idToNode[item.id]);
-              }
-            }
-          });
-
-          return root;
-        }
-
-        function createTreeNode(node) {
-          const li = document.createElement('li');
-          li.id = `node-${node.id}`;
-
-          const checkbox = document.createElement('input');
-          checkbox.type = 'checkbox';
-          checkbox.checked = node.checked;
-          checkbox.addEventListener('change', () => {
-            node.checked = checkbox.checked;
-            toggleChildren(node, checkbox.checked);
-            updateSelectedIds(node, checkbox.checked);
-            renderBrainTree();
-          });
-          li.appendChild(checkbox);
-
-          const label = document.createElement('span');
-          label.className = 'toggle';
-          label.innerHTML = `<strong>${node.name}</strong> (${node.acronym})`;
-          label.addEventListener('click', () => {
-            if (expandedNodes.has(node.id)) {
-              expandedNodes.delete(node.id);
-            } else {
-              expandedNodes.add(node.id);
-            }
-            renderBrainTree();
-          });
-          li.appendChild(label);
-
-          if (node.children && node.children.length > 0 && expandedNodes.has(node.id)) {
-            const ul = document.createElement('ul');
-            node.children.forEach(child => {
-              ul.appendChild(createTreeNode(child));
-            });
-            li.appendChild(ul);
-          }
-
-          return li;
-        }
-
-        function toggleChildren(node, isChecked) {
-          if (!node.children) return;
-          node.children.forEach(child => {
-            child.checked = isChecked;
-            toggleChildren(child, isChecked);
-          });
-        }
-
-        function updateSelectedIds(node, isChecked) {
-          if (isChecked) {
-            selectedStructureIds.add(node.id);
-          } else {
-            selectedStructureIds.delete(node.id);
-          }
-          if (node.children) {
-            node.children.forEach(child => updateSelectedIds(child, isChecked));
-          }
-        }
-
-        function renderBrainTree() {
-          const container = document.getElementById('brainStructureTree');
-          container.innerHTML = '';
-          if (!brainTreeData) return;
-          const ul = document.createElement('ul');
-          ul.appendChild(createTreeNode(brainTreeData));
-          container.appendChild(ul);
-        }
-
-        function getSelectedStructureIds() {
-          return Array.from(selectedStructureIds);
-        }
-
-                async function pollProcessingStatus() {
-          const pollInterval = 2000; // Check every 2 seconds
-
-          while (true) {
-            try {
-              const res = await fetch(`/api/dataset_status/${DATASET_ID}`);
-              const data = await res.json();
-
-              if (!data.success) {
-                showStatus(processStatus, `Error checking status: ${data.error}`, 'error');
-                processBtn.disabled = false;
-                break;
-              }
-
-              console.log('Current status:', data.status);
-
-              if (data.status === 'completed') {
-                showStatus(processStatus, 'Processing complete! Redirecting...', 'success');
-                setTimeout(() => {
-                  window.location.href = `/results_page?datasetId=${DATASET_ID}`;
-                }, 1000);
-                break;
-              } else if (data.status === 'failed') {
-                showStatus(processStatus, `Processing failed: ${data.results?.error || 'Unknown error'}`, 'error');
-                processBtn.disabled = false;
-                break;
-              } else if (data.status === 'processing') {
-                showStatus(processStatus, 'Processing... Please wait.', 'info');
-              }
-
-              // Wait before next poll
-              await new Promise(resolve => setTimeout(resolve, pollInterval));
-
-            } catch (error) {
-              showStatus(processStatus, `Status check failed: ${error.message}`, 'error');
-              processBtn.disabled = false;
-              break;
-            }
-          }
-        }
-
-        // ===================== HELPERS =====================
-        function showStatus(element, message, type) {
-          element.textContent = message;
-          element.className = 'status';
-          if (type) element.classList.add(type);
-        }
-
-        // Initialize brain structures
-        loadBrainStructures();
-      } catch (err) {
-        console.error('Error in processing section:', err);
       }
-    }); // closes processDatasetBtn listener
+      catch (error) {
+        showStatus(processStatus, `Processing failed: ${error.message}`, 'error')
+      }
+      finally {
+        processDatasetBtn.disabled = false
+      }
+    })
+
+    //====================== RESULTS PAGE ======================//
+    viewResultsBtn.addEventListener('click', () => {
+      if (!DATASET_ID) {
+        alert('Please upload and process a dataset first!');
+        return;
+      }
+      window.location.href = `/results_page?datasetId=${DATASET_ID}`
+      //window.location.href = '/results_page'
+    })
+
+    //==================== HELPER FUNCTIONS ====================//    
+    function showStatus(element, message, type) {
+      element.textContent = message
+      element.className = 'status'
+      if (type) element.classList.add(type)
+    }
+
+    function handleCheckbox(current, otherId) {
+      if (current.checked) {
+        document.getElementById(otherId).checked = false;
+      }
+    }
+    /* ===================== BRAIN STRUCTURE TREE LOGIC ===================== */
+
+    let expandedNodes = new Set();
+    let selectedStructureIds = new Set();
+    let brainTreeData = null;
+
+    // Load the full structure hierarchy from JSON
+    async function loadBrainStructures() {
+      try {
+        const res = await fetch("structures.json");
+        const data = await res.json();
+
+        // Convert flat array into a nested tree
+        brainTreeData = buildHierarchy(data);
+        renderBrainTree();
+      } catch (error) {
+        console.error("Error loading structures.json:", error);
+        document.getElementById("brainStructureTree").innerText =
+          "Error loading brain structures.";
+      }
+    }
+
+    // Build hierarchical tree from structure_id_path arrays
+    function buildHierarchy(flatData) {
+      const idToNode = {};
+      let root = null;
+
+      // First, create all nodes
+      flatData.forEach((item) => {
+        idToNode[item.id] = {
+          id: item.id,
+          name: item.name,
+          acronym: item.acronym,
+          checked: false,
+          children: []
+        };
+      });
+
+      // Then, link parents and children using structure_id_path
+      flatData.forEach((item) => {
+        const path = item.structure_id_path;
+        if (path.length === 1) {
+          root = idToNode[item.id];
+        } else {
+          const parentId = path[path.length - 2];
+          if (idToNode[parentId]) {
+            idToNode[parentId].children.push(idToNode[item.id]);
+          }
+        }
+      });
+
+      return root;
+    }
+
+    // Recursive node creation
+    function createTreeNode(node) {
+      const li = document.createElement("li");
+      li.id = `node-${node.id}`;
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = node.checked;
+
+      // Toggle selection, including nested children
+      checkbox.addEventListener("change", () => {
+        node.checked = checkbox.checked;
+        toggleChildren(node, checkbox.checked);
+        updateSelectedIds(node, checkbox.checked);
+        renderBrainTree(); // re-render so descendants update visually
+      });
+      li.appendChild(checkbox);
+
+      const label = document.createElement("span");
+      label.className = "toggle";
+      label.style.cursor = "pointer";
+      label.innerHTML = `<strong>${node.name}</strong> (${node.acronym})`;
+
+      label.addEventListener("click", () => {
+        if (expandedNodes.has(node.id)) expandedNodes.delete(node.id);
+        else expandedNodes.add(node.id);
+        renderBrainTree();
+      });
+
+      li.appendChild(label);
+
+      if (node.children && node.children.length > 0 && expandedNodes.has(node.id)) {
+        const ul = document.createElement("ul");
+        ul.style.paddingLeft = "20px";
+        node.children.forEach((child) => {
+          ul.appendChild(createTreeNode(child));
+        });
+        li.appendChild(ul);
+      }
+
+      return li;
+    }
+
+    // Recursive helper to toggle all children
+    function toggleChildren(node, isChecked) {
+      if (!node.children) return;
+      node.children.forEach((child) => {
+        child.checked = isChecked;
+        toggleChildren(child, isChecked);
+      });
+    }
+
+    // Recursive helper to update selected IDs
+    function updateSelectedIds(node, isChecked) {
+      if (isChecked) selectedStructureIds.add(node.id);
+      else selectedStructureIds.delete(node.id);
+
+      if (node.children) {
+        node.children.forEach((child) => updateSelectedIds(child, isChecked));
+      }
+    }
+
+    // Render the full tree
+    function renderBrainTree() {
+      const container = document.getElementById("brainStructureTree");
+      container.innerHTML = "";
+      if (!brainTreeData) return;
+      const ul = document.createElement("ul");
+      ul.appendChild(createTreeNode(brainTreeData));
+      container.appendChild(ul);
+    }
+
+    // Helper for saving parameters
+    function getSelectedStructureIds() {
+      return Array.from(selectedStructureIds);
+    }
+
+    // Initialize
+    loadBrainStructures();
   </script>
 </body>
+
 </html>
