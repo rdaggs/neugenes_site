@@ -1,62 +1,66 @@
-<!-- result page-->
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
   <meta charset="UTF-8">
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@700&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cal+Sans&display=swap" rel="stylesheet">
-
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <title>NeuGenes - Results</title>
   <style>
+    :root {
+      --bg-primary: #fafafa;
+      --bg-section: #ffffff;
+      --light-pink: #fffafd;
+      --border-soft: #fae6f2;
+      --border-accent: #d4a5c9;
+      --text-primary: #075058;
+      --text-secondary: #5a6f72;
+      --accent-teal: #0a5f5f;
+      --accent-teal-light: #e6f4f4;
+      --accent-coral: #b94920;
+      --accent-success: #44b830;
+    }
+
     body {
-      background: #ffffff;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
+      background: var(--light-pink);
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       padding: 40px;
       max-width: 1400px;
       margin: 0 auto;
+      color: var(--text-primary);
     }
 
     h1 {
       font-size: 2rem;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
-      font-weight: 500;
+      font-weight: 600;
       text-align: center;
-      line-height: 1.1;
       text-transform: uppercase;
-      letter-spacing: -0.02rem;
-      margin: 2rem 0 2rem;
-      color: #075058;
+      letter-spacing: 0.1em;
+      margin: 2rem 0;
+      color: var(--accent-teal);
     }
 
     h2 {
       font-size: 1.5rem;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
-      font-weight: 500;
+      font-weight: 600;
       text-align: center;
-      line-height: 1.1;
-      letter-spacing: -0.02rem;
-      color: #075058;
+      color: var(--text-primary);
+      margin-bottom: 1rem;
     }
 
     .back-button {
-      margin-top: 1rem;
-      padding: 0.5rem;
-      background: #eafdff;
-      border: 3px solid #bcfdff;
-      color: #075058;
+      padding: 0.6rem 1rem;
+      background: var(--accent-teal-light);
+      border: 2px solid var(--accent-teal);
+      color: var(--accent-teal);
       font-weight: 600;
       text-transform: uppercase;
-      border-radius: 5px;
+      border-radius: 6px;
       cursor: pointer;
+      font-family: inherit;
     }
 
     .back-button:hover {
-      background: #77d1db;
-      border-color: #075058;
+      background: #dfec57;
     }
 
     .content-wrapper {
@@ -67,16 +71,16 @@
 
     .image-column {
       flex: 2;
-      background: #fffafd;
+      background: var(--bg-section);
       padding: 20px;
-      border: 3px solid #ffdaf2;
+      border: 3px solid var(--border-soft);
     }
 
     .params-column {
       flex: 1;
-      background: #fffafd;
+      background: var(--bg-section);
       padding: 20px;
-      border: 3px solid #ffdaf2;
+      border: 3px solid var(--border-soft);
     }
 
     #resultImage {
@@ -96,14 +100,13 @@
       display: block;
       margin-bottom: 5px;
       font-weight: 600;
-      color: #075058;
+      color: var(--text-primary);
     }
 
     input[type="text"],
     input[type="number"],
     select {
-      border-radius: 0px;
-      border: 2px solid #c392b2;
+      border: 2px solid var(--border-accent);
       padding: 8px;
       width: 100%;
       box-sizing: border-box;
@@ -111,28 +114,26 @@
       font-size: 1rem;
       color: #333;
       background-color: #fff;
-    }
-
-    input[type="checkbox"] {
-      margin-left: 0;
+      border-radius: 6px;
     }
 
     .reprocess-btn {
       margin-top: 1rem;
       padding: 0.75rem;
       background: #ffd1c3;
-      border: 3px solid #e65428;
-      color: #075058;
+      border: 3px solid var(--accent-coral);
+      color: var(--text-primary);
       font-weight: 600;
       text-transform: uppercase;
-      border-radius: 5px;
+      border-radius: 6px;
       width: 100%;
       cursor: pointer;
+      font-family: inherit;
     }
 
     .reprocess-btn:hover {
-      background: #d3dd66;
-      border-color: #075058;
+      background: #dfec57;
+      border-color: var(--accent-teal);
     }
 
     .reprocess-btn:disabled {
@@ -141,10 +142,44 @@
       cursor: not-allowed;
     }
 
+    .download-btn {
+      margin-top: 0.5rem;
+      padding: 0.75rem;
+      background: var(--accent-teal-light);
+      border: 2px solid var(--accent-teal);
+      color: var(--accent-teal);
+      font-weight: 600;
+      text-transform: uppercase;
+      border-radius: 6px;
+      width: 100%;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .download-btn:hover {
+      background: #dfec57;
+    }
+
     .loading {
       text-align: center;
       padding: 40px;
-      color: #666;
+      color: var(--text-secondary);
+    }
+
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid var(--border-soft);
+      border-top-color: var(--accent-teal);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
     }
 
     .error {
@@ -158,24 +193,28 @@
     .status {
       margin-top: 15px;
       padding: 10px;
-      border-radius: 4px;
-      font-weight: bold;
+      border-radius: 6px;
+      font-weight: 600;
       text-align: center;
     }
 
     .status.success {
-      background: #d4edda;
-      color: #155724;
+      background: #e8f5ef;
+      color: var(--accent-success);
     }
 
     .status.error {
-      background: #f8d7da;
-      color: #721c24;
+      background: #ffeee8;
+      color: var(--accent-coral);
     }
 
     .status.info {
-      background: #d1ecf1;
-      color: #0c5460;
+      background: var(--accent-teal-light);
+      color: var(--accent-teal);
+    }
+
+    .status:empty {
+      display: none;
     }
 
     .histogram-row {
@@ -185,25 +224,37 @@
       margin-bottom: 2rem;
     }
 
+    .histogram-box {
+      text-align: center;
+    }
+
+    .hist-title {
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--text-secondary);
+    }
+
     .histogram-row img {
-      width: 300px;       /* small square */
-      height: 300px;
+      width: 200px;
+      height: 200px;
       object-fit: contain;
-      border: 2px solid #ffdaf2;
+      border: 2px solid var(--border-soft);
       padding: 6px;
       border-radius: 4px;
       background: white;
     }
-    select.param-input {
-      border-radius: 0px;
-      border: 2px solid #c392b2;
-      padding: 8px;
-      width: 100%;
-      box-sizing: border-box;
-      background: white;
-      font-family: inherit;
-      font-size: 1rem;
-      color: #333;
+
+    .processing-status {
+      text-align: center;
+      padding: 20px;
+      background: var(--accent-teal-light);
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .processing-status h3 {
+      margin: 0 0 10px 0;
+      color: var(--accent-teal);
     }
 
     @media (max-width: 900px) {
@@ -219,226 +270,331 @@
 
   <h1>Dataset Processing Results</h1>
 
-  <div id="loadingMessage" class="loading">Visualizing your results... (cell counting takes about ~50s per image)</div>
+  <!-- Processing Status (shown while waiting) -->
+  <div id="processingStatus" class="processing-status" style="display: none;">
+    <div class="loading-spinner"></div>
+    <h3>Processing in progress...</h3>
+    <p id="processingMessage">Please wait while your dataset is being analyzed.</p>
+  </div>
+
+  <div id="loadingMessage" class="loading">
+    <div class="loading-spinner"></div>
+    Loading results...
+  </div>
+
   <div id="errorMessage" class="error" style="display: none;"></div>
 
   <div id="contentWrapper" class="content-wrapper" style="display: none;">
     <!-- Left Column: Image (2/3 width) -->
     <div class="image-column">
-      <h2>Result Image</h2>
+      <h2>Heatmap</h2>
       <img id="resultImage" src="" alt="Processing result">
+
+      <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+        <button class="download-btn" id="downloadRawBtn">Download Raw CSV</button>
+        <button class="download-btn" id="downloadNormBtn">Download Normalized CSV</button>
+      </div>
     </div>
 
     <!-- Right Column: Parameters (1/3 width) -->
     <div class="params-column">
-      <h2>Parameters</h2>
-      
+      <h2>Adjust Normalization</h2>
+
       <!-- Histogram container -->
       <div class="histogram-row">
-        
         <div class="histogram-box">
-          <div class="hist-title">Raw Expression</div>
-          <img src="/results/histogramRaw.png" alt="Histogram" id="histogramImage">
+          <div class="hist-title">Raw</div>
+          <img src="" alt="Raw Histogram" id="histRaw">
         </div>
 
         <div class="histogram-box">
-          <div class="hist-title">Normalized Expression</div>
-          <img src="/results/histogramNorm.png" alt="Histogram" id="histogramImage">
+          <div class="hist-title">Normalized</div>
+          <img src="" alt="Normalized Histogram" id="histNorm">
         </div>
       </div>
 
       <div class="param-item">
-        <label for="removeTopN">Remove top N structures for coherence</label>
-        <input type="number" step="1" id="removeTopN" value="0">
+        <label for="removeTopN">Remove Top N Structures</label>
+        <input type="number" step="1" id="removeTopN" value="0" min="0">
       </div>
 
       <div class="param-item">
         <label for="normalizationStrength">Normalization Strength</label>
-        <input type="number" step = 0.1 id="normalizationStrength" value="0.0">
+        <input type="number" step="0.1" id="normalizationStrength" value="1.0" min="0">
       </div>
 
       <div class="param-item">
-      <label for="normType">Normalization Type</label>
-      <select id="normType">
-        <option value="none">None (Raw)</option>
-        <option value="zscore">Z-score</option>
-        <option value="minmax">Min-Max Scaling</option>
-        <option value="robust">Robust Scaling</option>
-      </select>
-    </div>
+        <label for="normType">Normalization Type</label>
+        <select id="normType">
+          <option value="none">None (Raw)</option>
+          <option value="zscore" selected>Z-score</option>
+          <option value="minmax">Min-Max Scaling</option>
+          <option value="robust">Robust Scaling</option>
+        </select>
+      </div>
 
-
-      <button class="reprocess-btn" id="reprocessBtn">Reprocess</button>
+      <button class="reprocess-btn" id="reprocessBtn">Renormalize</button>
       <p id="reprocessStatus" class="status"></p>
     </div>
   </div>
 
   <script>
+    // ===================== GET DATASET ID =====================
     function getDatasetId() {
-      // First, try to get from URL query parameters
       const urlParams = new URLSearchParams(window.location.search);
       const urlDatasetId = urlParams.get('datasetId');
-      
+
       if (urlDatasetId) {
-          // Save to sessionStorage for future use
-          sessionStorage.setItem('DATASET_ID', urlDatasetId);
-          return urlDatasetId;
+        sessionStorage.setItem('DATASET_ID', urlDatasetId);
+        return urlDatasetId;
       }
-      
-      // If not in URL, try sessionStorage
-      const storedDatasetId = sessionStorage.getItem('DATASET_ID');
-      if (storedDatasetId) {
-          return storedDatasetId;
-      }
-      
-      // No datasetId found
-      return null;
-  }
 
-let datasetId = getDatasetId();
+      return sessionStorage.getItem('DATASET_ID');
+    }
 
-    async function loadHeatmap(datasetId) {
+    const DATASET_ID = getDatasetId();
+
+    if (!DATASET_ID) {
+      showError('No dataset ID found. Please go back and process a dataset first.');
+    }
+
+    // ===================== INITIALIZATION =====================
+    async function init() {
+      if (!DATASET_ID) return;
 
       try {
-        console.log('fetching heatmap...')
+        // First check processing status
+        const status = await checkProcessingStatus();
 
-        const response = await fetch(`/api/result_heatmap?datasetId=${datasetId}`)
-        console.log('Response status:', response.status)
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
+        if (status.status === 'processing' || status.status === 'pending') {
+          // Still processing - show status and poll
+          showProcessingStatus();
+          await waitForProcessing();
+        } else if (status.status === 'failed') {
+          showError(`Processing failed: ${status.results?.error || 'Unknown error'}`);
+          return;
         }
 
-        const data = await response.json()
-        console.log('Received data:', data)
-
-        if (!data.success) {
-          showError(data.error || 'Failed to load results')
-          return
-        }
-
-        // Hide loading, show content
-        displayImage(data.heatMapPath)
+        // Processing complete - load results
+        await loadResults();
 
       } catch (error) {
-        console.error('Error loading results:', error)
-        showError(`Failed to load results: ${error.message}`)
+        console.error('Init error:', error);
+        showError(`Error: ${error.message}`);
       }
     }
 
-    async function loadHistograms() {
+    // ===================== CHECK STATUS =====================
+    async function checkProcessingStatus() {
+      const res = await fetch(`/api/processing_status/${DATASET_ID}`);
+      if (!res.ok) {
+        throw new Error(`Failed to check status: ${res.status}`);
+      }
+      return await res.json();
+    }
+
+    // ===================== WAIT FOR PROCESSING =====================
+    function showProcessingStatus() {
+      document.getElementById('loadingMessage').style.display = 'none';
+      document.getElementById('processingStatus').style.display = 'block';
+    }
+
+    async function waitForProcessing() {
+      const maxAttempts = 300; // 10 minutes at 2s intervals
+      let attempts = 0;
+
+      while (attempts < maxAttempts) {
+        const status = await checkProcessingStatus();
+
+        if (status.status === 'completed') {
+          document.getElementById('processingStatus').style.display = 'none';
+          return;
+        }
+
+        if (status.status === 'failed') {
+          throw new Error(status.results?.error || 'Processing failed');
+        }
+
+        document.getElementById('processingMessage').textContent =
+          `Processing... (${Math.round(attempts * 2 / 60)} min elapsed)`;
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        attempts++;
+      }
+
+      throw new Error('Processing timed out');
+    }
+
+    // ===================== LOAD RESULTS =====================
+    // ===================== LOAD RESULTS =====================
+    async function loadResults() {
+      document.getElementById('loadingMessage').style.display = 'block';
+      document.getElementById('loadingMessage').innerHTML =
+        '<div class="loading-spinner"></div>Loading results...';
+
+      let hasAnyContent = false;
+
+      // Try to load heatmap (but don't fail if it's not available)
       try {
-        console.log('fetching histograms...')
+        await loadHeatmap();
+        hasAnyContent = true;
+      } catch (error) {
+        console.warn('Heatmap not available:', error.message);
+        document.getElementById('resultImage').style.display = 'none';
+        // Show a placeholder message
+        const imageColumn = document.querySelector('.image-column');
+        const placeholder = document.createElement('p');
+        placeholder.style.textAlign = 'center';
+        placeholder.style.color = '#666';
+        placeholder.style.padding = '40px';
+        placeholder.textContent = 'Heatmap visualization not yet available';
+        imageColumn.appendChild(placeholder);
+      }
 
-        // Fetch both histogram endpoints
-        const res1 = await fetch('/api/histogram_raw')
-        console.log('Histogram 1 response:', res1.status)
+      // Try to load histograms (but don't fail if not available)
+      try {
+        await loadHistograms();
+      } catch (error) {
+        console.warn('Histograms not available:', error.message);
+      }
 
-        if (!res1.ok) {
-          throw new Error(`HTTP error on histogram 1! status: ${res1.status}`)
+      // Show content - the download buttons will still work
+      document.getElementById('loadingMessage').style.display = 'none';
+      document.getElementById('contentWrapper').style.display = 'flex';
+
+      // Check if we have CSV results
+      try {
+        const status = await checkProcessingStatus();
+        if (status.results?.csvPath || status.results?.csvNormPath) {
+          hasAnyContent = true;
+          console.log('CSV results available:', status.results);
         }
+      } catch (e) {
+        console.warn('Could not check for CSV results');
+      }
 
-        const res2 = await fetch('/api/histogram_norm')
-        console.log('Histogram 2 response:', res2.status)
-
-        if (!res2.ok) {
-          throw new Error(`HTTP error on histogram 2! status: ${res2.status}`)
-        }
-
-        // Parse JSON
-        const data1 = await res1.json()
-        console.log('Histogram 1 data:', data1)
-
-        if (!data1.success) {
-          console.error('Error loading histogram 1:', data1.error)
-          return
-        }
-
-        const data2 = await res2.json()
-        console.log('Histogram 2 data:', data2)
-
-        if (!data2.success) {
-          console.error('Error loading histogram 2:', data2.error)
-          return
-        }
-
-        // Insert images into DOM
-        document.getElementById('hist1').src = data1.histogramPath
-        document.getElementById('hist2').src = data2.histogramPath
-
-        document.getElementById('hist1').style.display = 'block'
-        document.getElementById('hist2').style.display = 'block'
-
-      } catch (err) {
-        console.error('Failed to load histograms:', err)
+      if (!hasAnyContent) {
+        showError('No results found. Processing may still be in progress.');
       }
     }
 
-    function displayImage(imagePath) {
-      console.log('Displaying image:', imagePath)
-      document.getElementById('loadingMessage').style.display = 'none'
-      document.getElementById('contentWrapper').style.display = 'flex'
-      document.getElementById('resultImage').src = imagePath
+    // ===================== LOAD HEATMAP =====================
+    async function loadHeatmap() {
+      console.log('Fetching heatmap...');
+
+      const response = await fetch(`/api/result_heatmap?datasetId=${DATASET_ID}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to load heatmap');
+      }
+
+      document.getElementById('resultImage').src = data.heatMapPath;
     }
 
-    function showError(message) {
-      document.getElementById('loadingMessage').style.display = 'none'
-      const errorDiv = document.getElementById('errorMessage')
-      errorDiv.textContent = message
-      errorDiv.style.display = 'block'
+    // ===================== LOAD HISTOGRAMS =====================
+    async function loadHistograms() {
+      console.log('Fetching histograms...');
+
+      try {
+        // Raw histogram
+        const res1 = await fetch(`/api/histogram_raw?datasetId=${DATASET_ID}`);
+        if (res1.ok) {
+          const data1 = await res1.json();
+          if (data1.success) {
+            document.getElementById('histRaw').src = data1.histogramPath;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not load raw histogram:', e);
+      }
+
+      try {
+        // Normalized histogram
+        const res2 = await fetch(`/api/histogram_norm?datasetId=${DATASET_ID}`);
+        if (res2.ok) {
+          const data2 = await res2.json();
+          if (data2.success) {
+            document.getElementById('histNorm').src = data2.histogramPath;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not load normalized histogram:', e);
+      }
     }
 
-    function showStatus(element, message, type) {
-      element.textContent = message
-      element.className = 'status'
-      if (type) element.classList.add(type)
-    }
+    // ===================== DOWNLOAD BUTTONS =====================
+    document.getElementById('downloadRawBtn').addEventListener('click', () => {
+      window.location.href = `/api/download_results/${DATASET_ID}?type=raw`;
+    });
 
-    // Reprocess button handler
+    document.getElementById('downloadNormBtn').addEventListener('click', () => {
+      window.location.href = `/api/download_results/${DATASET_ID}?type=normalized`;
+    });
+
+    // ===================== REPROCESS =====================
     document.getElementById('reprocessBtn').addEventListener('click', async () => {
-      const reprocessBtn = document.getElementById('reprocessBtn')
-      const reprocessStatus = document.getElementById('reprocessStatus')
+      const reprocessBtn = document.getElementById('reprocessBtn');
+      const reprocessStatus = document.getElementById('reprocessStatus');
 
       const payload = {
         datasetId: DATASET_ID,
-        remove_top_n: parseFloat(document.getElementById('removeTopN').value),
-        normalizationStrength: parseInt(document.getElementById('normalizationStrength').value),
-        normType: parseFloat(document.getElementById('normType').value)
-      }
+        remove_top_n: parseInt(document.getElementById('removeTopN').value) || 0,
+        normalizationStrength: parseFloat(document.getElementById('normalizationStrength').value) || 1.0,
+        normType: document.getElementById('normType').value
+      };
 
       try {
-        reprocessBtn.disabled = true
-        showStatus(reprocessStatus, 'Saving parameters and reprocessing...', 'info')
+        reprocessBtn.disabled = true;
+        showStatus(reprocessStatus, 'Renormalizing...', 'info');
 
-        // Save parameters
         const saveRes = await fetch('/accept_renorm_parameters', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
-        })
+        });
 
-        const saveData = await saveRes.json()
+        const saveData = await saveRes.json();
+
         if (!saveData.success) {
-          throw new Error(saveData.error || 'Failed to save parameters')
+          throw new Error(saveData.error || 'Failed to save parameters');
         }
 
-      } 
-      catch (error) {
-        showStatus(reprocessStatus, `Error: ${error.message}`, 'error')
-        console.error('Reprocess error:', error)
+        // Reload histograms
+        await loadHistograms();
+
+        showStatus(reprocessStatus, 'Renormalization complete!', 'success');
+
+      } catch (error) {
+        showStatus(reprocessStatus, `Error: ${error.message}`, 'error');
+        console.error('Reprocess error:', error);
       } finally {
-        reprocessBtn.disabled = false
+        reprocessBtn.disabled = false;
       }
-    })
-    function handleCheckbox(current, otherId) {
-      if (current.checked) {
-        document.getElementById(otherId).checked = false;
-      }
+    });
+
+    // ===================== HELPERS =====================
+    function showError(message) {
+      document.getElementById('loadingMessage').style.display = 'none';
+      document.getElementById('processingStatus').style.display = 'none';
+      const errorDiv = document.getElementById('errorMessage');
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
     }
 
-    // Load results when page loads
-    loadHeatmap(datasetId)
-    loadHistograms()
+    function showStatus(element, message, type) {
+      element.textContent = message;
+      element.className = 'status';
+      if (type) element.classList.add(type);
+    }
+
+    // ===================== START =====================
+    init();
   </script>
 </body>
 
