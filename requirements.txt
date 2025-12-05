@@ -1,0 +1,26 @@
+# FastAPI Processing Service Dependencies
+# Install with: pip install -r requirements.txt
+
+# Web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# Data validation
+pydantic>=2.0.0
+
+# MongoDB
+pymongo>=4.5.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# Your existing model dependencies (uncomment/modify as needed)
+opencv-python>=4.8.0
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-image>=0.21.0
+allensdk>=2.15.0
+matplotlib>=3.7.0
+scipy>=1.11.0
+Pillow>=10.0.0
+tifffile>=2023.7.0

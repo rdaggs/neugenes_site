@@ -789,7 +789,7 @@
 
 
     //==================== PROCESS FUNCTION ====================//
-    processDatasetBtn.addEventListener('click', async () => {
+    processBtn.addEventListener('click', async () => {
       //processDatasetBtn.disabled = true
       showStatus(processStatus, 'running algorithm...', 'info')
 
@@ -822,7 +822,7 @@
         showStatus(processStatus, `Processing failed: ${error.message}`, 'error')
       }
       finally {
-        processDatasetBtn.disabled = false
+        processBtn.disabled = false
       }
     })
 
@@ -857,7 +857,7 @@
     // Load the full structure hierarchy from JSON
     async function loadBrainStructures() {
       try {
-        const res = await fetch("structures.json");
+        const res = await fetch("/structures.json");
         const data = await res.json();
 
         // Convert flat array into a nested tree
