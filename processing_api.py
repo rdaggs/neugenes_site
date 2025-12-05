@@ -1,14 +1,5 @@
 """
 FastAPI Processing Service for NeuGenes Brain Analysis
-
-This service acts as a bridge between the Express.js backend and the Python
-processing pipeline. It handles:
-1. Receiving processing requests from Express
-2. Downloading images from MongoDB GridFS to a temp directory
-3. Running the brain analysis pipeline
-4. Returning results (CSV paths) back to Express
-
-Run with: uvicorn processing_api:app --host 0.0.0.0 --port 8000 --reload
 """
 
 import os
@@ -31,17 +22,15 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Add model directory to path for imports
-MODEL_DIR = Path(__file__).parent / "neugenes" / "model"
-NEUGENES_DIR = Path(__file__).parent / "neugenes"
+# Add directories to path for imports
+PROJECT_ROOT = Path(__file__).parent
+MODEL_DIR = PROJECT_ROOT / "neugenes" / "model"
+PROCESSING_SCRIPTS_DIR = PROJECT_ROOT / "neugenes" / "processing-scripts"
 
-# Add both paths - model dir first so "from model.config" works
-sys.path.insert(0, str(MODEL_DIR))      # For "from utils import ..."
-sys.path.insert(0, str(NEUGENES_DIR))   # For "import model.config" and "from model.x import ..."
-
-# Import your processing function (adjust path as needed)
-# from cell_count_engine import process
-# For now, we'll create a wrapper that imports it dynamically
+sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(MODEL_DIR.parent))
+sys.path.insert(0, str(MODEL_DIR))
+sys.path.insert(0, str(PROCESSING_SCRIPTS_DIR))
 
 app = FastAPI(
     title="NeuGenes Processing API",
@@ -53,8 +42,8 @@ app = FastAPI(
 
 class Config:
     MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/neugenes")
-    TEMP_DIR = Path(__file__).parent / "temp_processing"
-    OUTPUT_DIR = Path(__file__).parent / "neugenes" / "dataset_processed"
+    TEMP_DIR = PROJECT_ROOT / "temp_processing"
+    OUTPUT_DIR = PROJECT_ROOT / "neugenes" / "dataset_processed"
     MODEL_DIR = MODEL_DIR
     
 Config.TEMP_DIR.mkdir(exist_ok=True)
@@ -70,10 +59,9 @@ class JobStatus(str, Enum):
     FAILED = "failed"
 
 class ProcessingParameters(BaseModel):
-    """Parameters for brain analysis processing"""
-    structure_acronyms: List[str] = Field(default=["FULL_BRAIN"], description="Brain structure acronyms to analyze")
-    dot_count: bool = Field(default=False, description="Enable dot counting mode")
-    expression_intensity: bool = Field(default=False, description="Enable expression intensity mode")
+    structure_acronyms: List[str] = Field(default=["FULL_BRAIN"])
+    dot_count: bool = Field(default=False)
+    expression_intensity: bool = Field(default=False)
     threshold_scale: float = Field(default=1.0, ge=0.1, le=10.0)
     layer_in_tiff: int = Field(default=1, ge=1)
     patch_size: int = Field(default=7, ge=1)
@@ -81,24 +69,21 @@ class ProcessingParameters(BaseModel):
     z_threshold: float = Field(default=1.2, ge=0.0)
 
 class ProcessingRequest(BaseModel):
-    """Request to start processing a dataset"""
     dataset_id: str
     parameters: ProcessingParameters = ProcessingParameters()
     experiment_name: Optional[str] = None
 
 class ProcessingResponse(BaseModel):
-    """Response after starting processing"""
     job_id: str
     dataset_id: str
     status: JobStatus
     message: str
 
 class JobStatusResponse(BaseModel):
-    """Response for job status query"""
     job_id: str
     dataset_id: str
     status: JobStatus
-    progress: int = 0  # 0-100
+    progress: int = 0
     message: str
     result_csv_path: Optional[str] = None
     result_norm_csv_path: Optional[str] = None
@@ -106,13 +91,18 @@ class JobStatusResponse(BaseModel):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
+class HistogramRequest(BaseModel):
+    raw: bool = True
+    remove_top_n: int = 0
+    exclude_regions: Optional[List[str]] = None
+    top_n_display: int = 30
+    power_exponent: float = 3.0
+
 # ===================== JOB TRACKING ===================== #
 
-# In-memory job store (replace with Redis for production)
 jobs: dict[str, dict] = {}
 
 def create_job(dataset_id: str) -> str:
-    """Create a new processing job"""
     job_id = f"job_{dataset_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     jobs[job_id] = {
         "dataset_id": dataset_id,
@@ -128,30 +118,22 @@ def create_job(dataset_id: str) -> str:
     return job_id
 
 def update_job(job_id: str, **kwargs):
-    """Update job status"""
     if job_id in jobs:
         jobs[job_id].update(kwargs)
 
 # ===================== MONGODB HELPERS ===================== #
 
 def get_mongo_client():
-    """Get MongoDB client"""
     return MongoClient(Config.MONGO_URI)
 
 def get_gridfs_bucket(db):
-    """Get GridFS bucket for image storage"""
     return GridFSBucket(db, bucket_name="uploads")
 
 def download_images_from_gridfs(dataset_id: str, output_dir: Path) -> List[Path]:
-    """
-    Download all images for a dataset from GridFS to local directory.
-    Returns list of downloaded file paths.
-    """
     client = get_mongo_client()
     db = client.get_database()
     bucket = get_gridfs_bucket(db)
     
-    # Find all images for this dataset
     images_collection = db["imageattrs"]
     images = list(images_collection.find({
         "datasetId": ObjectId(dataset_id),
@@ -167,7 +149,6 @@ def download_images_from_gridfs(dataset_id: str, output_dir: Path) -> List[Path]
         
         if grid_fs_id:
             try:
-                # Download from GridFS
                 output_path = output_dir / original_name
                 with open(output_path, "wb") as f:
                     bucket.download_to_stream(grid_fs_id, f)
@@ -180,7 +161,6 @@ def download_images_from_gridfs(dataset_id: str, output_dir: Path) -> List[Path]
     return downloaded_files
 
 def get_dataset_parameters(dataset_id: str) -> dict:
-    """Get dataset parameters from MongoDB"""
     client = get_mongo_client()
     db = client.get_database()
     
@@ -192,8 +172,19 @@ def get_dataset_parameters(dataset_id: str) -> dict:
     
     return dataset.get("parameters", {})
 
+def get_dataset(dataset_id: str) -> dict:
+    client = get_mongo_client()
+    db = client.get_database()
+    
+    dataset = db["datasets"].find_one({"_id": ObjectId(dataset_id)})
+    client.close()
+    
+    if not dataset:
+        raise ValueError(f"Dataset {dataset_id} not found")
+    
+    return dataset
+
 def update_dataset_results(dataset_id: str, results: dict):
-    """Update dataset with processing results"""
     client = get_mongo_client()
     db = client.get_database()
     
@@ -213,17 +204,9 @@ def update_dataset_results(dataset_id: str, results: dict):
 # ===================== PROCESSING LOGIC ===================== #
 
 async def run_processing_pipeline(job_id: str, dataset_id: str, params: ProcessingParameters):
-    """
-    Main processing pipeline - runs in background.
-    
-    1. Download images from GridFS
-    2. Run the brain analysis
-    3. Save results and update database
-    """
     temp_dir = Config.TEMP_DIR / job_id
     
     try:
-        # Step 1: Download images
         update_job(job_id, status=JobStatus.DOWNLOADING, progress=10, message="Downloading images from database...")
         
         image_dir = temp_dir / "images"
@@ -233,29 +216,20 @@ async def run_processing_pipeline(job_id: str, dataset_id: str, params: Processi
             raise ValueError("No valid images found in dataset")
         
         update_job(job_id, progress=20, message=f"Downloaded {len(downloaded_files)} images")
-        
-        # Step 2: Run processing
         update_job(job_id, status=JobStatus.PROCESSING, progress=30, message="Running brain analysis...")
         
-        # Prepare output directory
         output_dir = Config.OUTPUT_DIR / dataset_id
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Convert parameters for the process function
         structure_acronyms = params.structure_acronyms
         if structure_acronyms == ["FULL_BRAIN"]:
             structure_acronyms = "FULL_BRAIN"
         
-        # Import and run the actual processing
         try:
-            # Dynamic import to avoid startup issues if model files are missing
             from cell_count_engine import process
             
             update_job(job_id, progress=40, message="Processing brain regions...")
             
-            # Call your process function
-            # Note: Your process() function expects base_dir to be relative to root
-            # We need to adapt this based on your actual function signature
             result = process(
                 base_dir=str(image_dir),
                 structure_acronymns=structure_acronyms,
@@ -271,17 +245,14 @@ async def run_processing_pipeline(job_id: str, dataset_id: str, params: Processi
             update_job(job_id, progress=80, message="Processing complete, saving results...")
             
         except ImportError as e:
-            # If the model can't be imported, use a mock for testing
             print(f"Warning: Could not import processing module: {e}")
             print("Using mock processing for testing...")
             
-            await asyncio.sleep(3)  # Simulate processing time
+            await asyncio.sleep(3)
             
-            # Create mock result files
             result_csv = output_dir / "result_raw.csv"
             result_norm_csv = output_dir / "result_norm.csv"
             
-            # Write mock CSV data
             mock_csv_content = "Filename,mask_VPL,mask_BLA,mask_PVT\n"
             for f in downloaded_files:
                 mock_csv_content += f"{f.name},42,38,55\n"
@@ -291,23 +262,18 @@ async def run_processing_pipeline(job_id: str, dataset_id: str, params: Processi
             
             result = {"mock": True}
         
-        # Step 3: Save results
         update_job(job_id, progress=90, message="Saving results to database...")
         
-        # Find the result files (they should be in the output directory)
         result_csv_path = None
         result_norm_csv_path = None
         
-        # Check for result files in the processing output
         for csv_file in output_dir.glob("*.csv"):
             if "norm" in csv_file.name.lower():
                 result_norm_csv_path = str(csv_file.relative_to(Config.OUTPUT_DIR))
             elif "raw" in csv_file.name.lower() or "result" in csv_file.name.lower():
                 result_csv_path = str(csv_file.relative_to(Config.OUTPUT_DIR))
         
-        # Also check in the image directory (where your process function might save)
         for csv_file in image_dir.glob("**/*.csv"):
-            # Copy to output directory
             dest = output_dir / csv_file.name
             shutil.copy2(csv_file, dest)
             if "norm" in csv_file.name.lower():
@@ -315,13 +281,11 @@ async def run_processing_pipeline(job_id: str, dataset_id: str, params: Processi
             else:
                 result_csv_path = str(dest.relative_to(Config.OUTPUT_DIR))
         
-        # Update database with results
         update_dataset_results(dataset_id, {
             "csv_path": result_csv_path,
             "csv_norm_path": result_norm_csv_path
         })
         
-        # Mark job complete
         update_job(
             job_id,
             status=JobStatus.COMPLETED,
@@ -348,7 +312,6 @@ async def run_processing_pipeline(job_id: str, dataset_id: str, params: Processi
         )
     
     finally:
-        # Cleanup temp directory
         if temp_dir.exists():
             try:
                 shutil.rmtree(temp_dir)
@@ -359,7 +322,6 @@ async def run_processing_pipeline(job_id: str, dataset_id: str, params: Processi
 
 @app.get("/")
 async def root():
-    """Health check endpoint"""
     return {
         "service": "NeuGenes Processing API",
         "status": "running",
@@ -368,8 +330,6 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Detailed health check"""
-    # Check MongoDB connection
     mongo_ok = False
     try:
         client = get_mongo_client()
@@ -387,24 +347,13 @@ async def health_check():
 
 @app.post("/process", response_model=ProcessingResponse)
 async def start_processing(request: ProcessingRequest, background_tasks: BackgroundTasks):
-    """
-    Start processing a dataset.
-    
-    This endpoint:
-    1. Creates a job
-    2. Starts background processing
-    3. Returns immediately with job ID for polling
-    """
-    # Validate dataset exists
     try:
         get_dataset_parameters(request.dataset_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     
-    # Create job
     job_id = create_job(request.dataset_id)
     
-    # Start background processing
     background_tasks.add_task(
         run_processing_pipeline,
         job_id,
@@ -421,7 +370,6 @@ async def start_processing(request: ProcessingRequest, background_tasks: Backgro
 
 @app.get("/jobs/{job_id}", response_model=JobStatusResponse)
 async def get_job_status(job_id: str):
-    """Get the status of a processing job"""
     if job_id not in jobs:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
     
@@ -441,7 +389,6 @@ async def get_job_status(job_id: str):
 
 @app.get("/jobs")
 async def list_jobs():
-    """List all jobs (for debugging)"""
     return {
         "jobs": [
             {
@@ -454,9 +401,192 @@ async def list_jobs():
         ]
     }
 
+# ===================== VISUALIZATION ENDPOINTS ===================== #
+
+@app.post("/visualize/histogram/{dataset_id}")
+async def generate_histogram(dataset_id: str, request: HistogramRequest = HistogramRequest()):
+    """Generate histogram visualization for a dataset"""
+    try:
+        # Import the histogram generator
+        from generate_histogram import generate_brain_region_histogram
+        
+        # Get dataset info
+        dataset = get_dataset(dataset_id)
+        results = dataset.get("results", {})
+        
+        # Determine which CSV to use
+        if request.raw:
+            csv_path = results.get("csvPath")
+            output_filename = "histogram_raw.png"
+        else:
+            csv_path = results.get("csvNormPath") or results.get("csvPath")
+            output_filename = "histogram_norm.png"
+        
+        if not csv_path:
+            raise HTTPException(status_code=404, detail="No CSV results found. Process the dataset first.")
+        
+        # Build full paths
+        full_csv_path = Config.OUTPUT_DIR / csv_path
+        output_dir = Config.OUTPUT_DIR / dataset_id
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_image_path = output_dir / output_filename
+        
+        if not full_csv_path.exists():
+            raise HTTPException(status_code=404, detail=f"CSV file not found: {csv_path}")
+        
+        # Generate histogram
+        result = generate_brain_region_histogram(
+            csv_path=str(full_csv_path),
+            output_image_path=str(output_image_path),
+            remove_top_n=request.remove_top_n,
+            exclude_regions=request.exclude_regions,
+            top_n_display=request.top_n_display,
+            power_exponent=request.power_exponent,
+            apply_normalization=True,
+            verbose=True
+        )
+        
+        if not result.get("success"):
+            raise HTTPException(status_code=500, detail=result.get("error", "Histogram generation failed"))
+        
+        # Update database with histogram path
+        client = get_mongo_client()
+        db = client.get_database()
+        
+        update_field = "results.histogramRawPath" if request.raw else "results.histogramNormPath"
+        relative_path = f"{dataset_id}/{output_filename}"
+        
+        db["datasets"].update_one(
+            {"_id": ObjectId(dataset_id)},
+            {"$set": {update_field: relative_path}}
+        )
+        client.close()
+        
+        return {
+            "success": True,
+            "histogram_path": f"/results/{relative_path}",
+            "n_regions_displayed": result.get("n_regions_displayed")
+        }
+        
+    except HTTPException:
+        raise
+    except ImportError as e:
+        raise HTTPException(status_code=500, detail=f"Could not import histogram generator: {e}")
+    except Exception as e:
+        print(f"Histogram generation error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/visualize/heatmap/{dataset_id}")
+async def generate_heatmap(dataset_id: str):
+    """Generate heatmap visualization for a dataset"""
+    try:
+        # Add the heatmap scripts to path
+        heatmap_scripts_dir = PROJECT_ROOT / "neugenes" / "processing-scripts" / "manual-heatmap"
+        sys.path.insert(0, str(heatmap_scripts_dir))
+        
+        import matplotlib
+        matplotlib.use('Agg')  # Non-interactive backend
+        import matplotlib.pyplot as plt
+        
+        # Import the heatmap modules
+        import CustomHeatMap as chm
+        import ResultProcessor as rp
+        
+        # Get dataset info
+        dataset = get_dataset(dataset_id)
+        results = dataset.get("results", {})
+        
+        # Use normalized CSV if available, otherwise raw
+        csv_path = results.get("csvNormPath") or results.get("csvPath")
+        
+        if not csv_path:
+            raise HTTPException(status_code=404, detail="No CSV results found. Process the dataset first.")
+        
+        # Build full paths
+        full_csv_path = Config.OUTPUT_DIR / csv_path
+        output_dir = Config.OUTPUT_DIR / dataset_id
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_image_path = output_dir / "heatmap.png"
+        
+        if not full_csv_path.exists():
+            raise HTTPException(status_code=404, detail=f"CSV file not found: {csv_path}")
+        
+        print(f"Generating heatmap from: {full_csv_path}")
+        
+        # Create colormap
+        cmap = chm.create_transparent_colormap("PuRd")
+        
+        # Read CSV and generate data dict
+        structure_data, (min_val, max_val) = rp.read_single_csv_and_generate_dict(str(full_csv_path))
+        print(f"Structure data loaded: {len(structure_data)} regions, min={min_val}, max={max_val}")
+        
+        # Create mapped dict with NaN for missing regions
+        data_dict = chm.create_mapped_nan_dict(structure_data)
+        
+        # Generate the heatmap
+        fig, axs = plt.subplots(6, 4, figsize=(18, 12))
+        positions = range(0, 12000, 500)
+        scenes = []
+        
+        for distance in positions:
+            scene = chm.CustomHeatMap(
+                data_dict,
+                position=distance,
+                orientation="frontal",
+                thickness=10,
+                format="2D",
+                check_latest=False,
+                cmap=cmap,
+                vmin=min_val,
+                vmax=max_val,
+                label_regions=False,
+                annotate_regions=False,
+            )
+            scenes.append(scene)
+        
+        for scene, ax, pos in zip(scenes, axs.flatten(), positions):
+            scene.plot_subplot(fig=fig, ax=ax, show_cbar=True, hide_axes=False)
+            print(f"Heatmap: finished processing slice at {pos} µm")
+        
+        plt.tight_layout()
+        plt.savefig(str(output_image_path), dpi=300)
+        plt.close(fig)
+        
+        print(f"Heatmap saved to: {output_image_path}")
+        
+        # Update database with heatmap path
+        client = get_mongo_client()
+        db = client.get_database()
+        
+        relative_path = f"{dataset_id}/heatmap.png"
+        db["datasets"].update_one(
+            {"_id": ObjectId(dataset_id)},
+            {"$set": {"results.heatmapPath": relative_path}}
+        )
+        client.close()
+        
+        return {
+            "success": True,
+            "heatmap_path": f"/results/{relative_path}"
+        }
+        
+    except HTTPException:
+        raise
+    except ImportError as e:
+        print(f"Import error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Could not import heatmap modules: {e}. Try: pip install brainglobe-heatmap")
+    except Exception as e:
+        print(f"Heatmap generation error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/results/{dataset_id}/raw")
 async def download_raw_csv(dataset_id: str):
-    """Download raw results CSV"""
     csv_path = Config.OUTPUT_DIR / dataset_id / "result_raw.csv"
     
     if not csv_path.exists():
@@ -470,7 +600,6 @@ async def download_raw_csv(dataset_id: str):
 
 @app.get("/results/{dataset_id}/normalized")
 async def download_normalized_csv(dataset_id: str):
-    """Download normalized results CSV"""
     csv_path = Config.OUTPUT_DIR / dataset_id / "result_norm.csv"
     
     if not csv_path.exists():

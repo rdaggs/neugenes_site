@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 import cv2
-from model import config
+from neugenes.model.brain_processor import config
 from model.data_preprocessing import spaces_in_filenames, nd2_to_tiff
 from model.signal_postprocessing import (to_csv,
                                    update_structure_weights,

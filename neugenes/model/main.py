@@ -1,5 +1,5 @@
 import argparse
-from model import process
+from neugenes.model.brain_processor import process
 
 def main():
     print('parsing...')
