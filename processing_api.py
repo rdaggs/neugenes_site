@@ -33,8 +33,11 @@ load_dotenv()
 
 # Add model directory to path for imports
 MODEL_DIR = Path(__file__).parent / "neugenes" / "model"
-sys.path.insert(0, str(MODEL_DIR.parent))
-sys.path.insert(0, str(MODEL_DIR))
+NEUGENES_DIR = Path(__file__).parent / "neugenes"
+
+# Add both paths - model dir first so "from model.config" works
+sys.path.insert(0, str(MODEL_DIR))      # For "from utils import ..."
+sys.path.insert(0, str(NEUGENES_DIR))   # For "import model.config" and "from model.x import ..."
 
 # Import your processing function (adjust path as needed)
 # from cell_count_engine import process

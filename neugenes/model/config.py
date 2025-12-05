@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+import Path
 
 # # Load environment variables from .env file
 load_dotenv()
@@ -9,9 +10,9 @@ root = '/Users/riley/Desktop/neugenes_site'
 # root = os.getenv('ROOT_PATH')
 # if root is None:
 #     raise ValueError("ROOT_PATH not found in .env file. Please create a .env file with ROOT_PATH set.")
-root_directory = os.path.join(root,'model')
-root_directory_new = root
-output_directory = os.path.join(root_directory,'model')
+root = Path(__file__).parent.parent.resolve()  # neugenes/
+root_directory = Path(__file__).parent.resolve()  # neugenes/model/
+output_directory = root_directory / 'output'
 
 # AllenSDK routing
 from allensdk.core.mouse_connectivity_cache import MouseConnectivityCache
