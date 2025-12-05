@@ -77,43 +77,106 @@ export async function Process(dataset, images, bucket = null) {
     }
 }
 
+
 export async function generateHeatmap(datasetId) {
-    console.log(`Generating heatmap for dataset: ${datasetId}`)
-
-    const dataset = await Dataset.findById(datasetId)
-    if (!dataset) {
-        throw new Error(`Dataset ${datasetId} not found`)
-    }
-
-    const outputDir = path.join(DATASET_PROCESSED_DIR, datasetId)
-    if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true })
-    }
-
-    const heatmapPath = path.join(outputDir, 'heatmap.png')
-
     try {
-        const response = await fetch(`http://localhost:8000/visualize/heatmap/${datasetId}`, {
-            method: 'POST'
-        })
 
-        if (response.ok) {
-            const result = await response.json()
-            return {
-                success: true,
-                heatmapPath: result.heatmap_path || heatmapPath
-            }
+        if (!datasetId) {
+            throw new Error('datasetId is required')
         }
-    } catch (e) {
-        console.log('FastAPI heatmap endpoint not available, using placeholder')
-    }
 
-    return {
-        success: true,
-        heatmapPath: heatmapPath,
-        placeholder: true
+        const dataset = await Dataset.findById(datasetId)
+        if (!dataset) {
+            throw new Error(`dataset with id:${datasetId} dne`)
+        }
+
+        // check if csv exists 
+        let csvPath;
+        if (dataset.results.result_norm_csv_path) {
+            console.log('using result_norm_csv_path')
+            csvPath = dataset.results.csvPathNorm;
+        }
+        else {
+            // Fallback to default location
+            console.log(`fallback result used. r_n.csv dne for ${datasetId}`)
+            csvPath = path.join(DATASET_PROCESSED_DIR, 'result_norm.csv')
+        }
+        if (!fs.existsSync(csvPath)) {
+            throw new Error(`csv not found at ${csvPath}`)
+            const filesInDir = fs.readdirSync(DATASET_PROCESSED_DIR)
+            console.log('Files in dataset_processed directory:', filesInDir)
+        }
+
+        console.log(`generating heatmap for dataset ${datasetId} with ${csvPath}`)
+
+        return new Promise((resolve, reject) => {
+
+            const heatmapProcess = spawn('python', [
+                path.join(HEATMAP_GENERATOR, 'generate_heatmap_per_dataset.py'),
+                path.join(DATASET_PROCESSED_DIR, 'result_norm.csv'),
+                '--output', path.join(DATASET_PROCESSED_DIR, 'result_norm.png')
+            ])
+
+
+            // python output
+            let stdoutData = ''
+            let stderrData = ''
+            const heatmapPath = path.join(DATASET_PROCESSED_DIR, 'result_norm.png')
+            console.log('heatmapPath', heatmapPath)
+
+
+            heatmapProcess.stdout.on('data', (data) => {
+                const output = data.toString()
+                stdoutData += output
+                console.log(`Heatmap stdout: ${output}`)
+                process.stdout.write(output)
+            })
+
+            heatmapProcess.stderr.on('data', (data) => {
+                const output = data.toString()
+                stderrData += output
+                console.error(`Heatmap stderr: ${output}`)
+                process.stderr.write(output)
+            })
+
+            heatmapProcess.on('close', async (code) => {
+                if (code === 0) {
+                    console.log('heatmap generated successfully')
+
+                    // add heatmap to dataset 
+                    try {
+                        await Dataset.findByIdAndUpdate(datasetId, {
+                            $set: {
+                                'results.heatmap_path': heatmapPath
+                            }
+                        })
+                        console.log(`updated dataset ${datasetId} with heatmap path: ${heatmapPath}`)
+                    }
+                    catch (updateError) {
+                        console.error('Error updating dataset with heatmap path:', updateError)
+                    }
+                    resolve({
+                        success: true,
+                        heatmapPath: heatmapPath,
+                        stdout: stdoutData
+                    })
+                }
+                else {
+                    reject(new Error(`heatmap generation failed with code ${code}`))
+                }
+            })
+            heatmapProcess.on('error', (error) => {
+                reject(new Error(`Failed to start heatmap generation process: ${error.message}`));
+            })
+        })
+    }
+    catch (error) {
+        console.error('error in generateHeatmap:', error)
+        throw error
     }
 }
+
+
 
 export async function generateHistogram(datasetId, raw = true, params = {}) {
     console.log(`Generating ${raw ? 'raw' : 'normalized'} histogram for dataset: ${datasetId}`)
