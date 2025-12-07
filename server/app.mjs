@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url'
 // custom functions
 import { APP_CONFIG } from '../config.mjs'
 import { generateHeatmap, generateHistogram, Process } from './utils.mjs'
-import { connectDatabase, Dataset, ImageAttr, storeImage } from './db.mjs'
+import { connectDatabase, Dataset, ImageAttr, storeImage,findExistingDatasetForImages } from './db.mjs'
 import { ProcessingHandler } from './processing-handler.mjs'
 
 dotenv.config()
@@ -164,6 +164,44 @@ app.post('/upload_dataset', upload.array('files', IMG_UPLOAD_CEILING), async (re
         })
     }
 })
+
+
+app.post('/check_duplicate_images', upload.array('files', IMG_UPLOAD_CEILING), async (req, res) => {
+    try {
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ error: 'No files provided' })
+        }
+
+        const result = await findExistingDatasetForImages(req.files)
+        
+        // Clean up temp files
+        req.files.forEach(file => {
+            try {
+                if (fs.existsSync(file.path)) fs.unlinkSync(file.path)
+            } catch (e) {}
+        })
+
+        if (result) {
+            return res.json({
+                duplicatesFound: true,
+                existingDataset: {
+                    id: result.dataset._id,
+                    name: result.dataset.name,
+                    status: result.dataset.status,
+                    imageCount: result.dataset.images?.length || 0
+                },
+                matchCount: result.matchCount,
+                totalUploaded: result.totalUploaded
+            })
+        }
+
+        res.json({ duplicatesFound: false })
+    } catch (error) {
+        console.error('Error checking duplicates:', error)
+        res.status(500).json({ error: error.message })
+    }
+})
+
 
 app.post('/accept_dataset_parameters', async (req, res) => {
     try {
@@ -480,10 +518,12 @@ app.get('/api/result_heatmap', async (req, res) => {
             })
         }
 
-        if (dataset.results.heatmapPath) {
+        if (dataset.results.heatmapPath && fs.existsSync(dataset.results.heatmapPath)) {
+            const relativePath = path.relative(DATASET_PROCESSED_DIR, dataset.results.heatmapPath)
+            console.log('relativePath=',relativePath)
             return res.json({
                 success: true,
-                heatMapPath: `/results/${dataset.results.heatmapPath}`,
+                heatMapPath: `/results/${relativePath}`,
                 alreadyExists: true
             })
         }

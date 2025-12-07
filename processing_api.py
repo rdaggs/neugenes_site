@@ -253,9 +253,9 @@ async def run_processing_pipeline(job_id: str, dataset_id: str, params: Processi
             result_csv = output_dir / "result_raw.csv"
             result_norm_csv = output_dir / "result_norm.csv"
             
-            mock_csv_content = "Filename,mask_VPL,mask_BLA,mask_PVT\n"
+            mock_csv_content = "Filename,VPL,BLA,PVT\n"
             for f in downloaded_files:
-                mock_csv_content += f"{f.name},42,38,55\n"
+                mock_csv_content += f"{f.name},42.333,27.1194,55.26\n"
             
             result_csv.write_text(mock_csv_content)
             result_norm_csv.write_text(mock_csv_content)

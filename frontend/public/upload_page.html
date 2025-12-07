@@ -733,6 +733,38 @@
       formData.append('createdBy', USERNAME);
 
       uploadBtn.disabled = true;
+      try {
+        // ==================== CHECK FOR DUPLICATES FIRST ====================
+        const checkRes = await fetch('/check_duplicate_images', {
+          method: 'POST',
+          body: formData
+        });
+        
+        const checkData = await checkRes.json();
+        const datasetName = checkData.existingDataset.parameters?.experiment_name || checkData.existingDataset.name || 'Unnamed Dataset';
+        
+
+        if (checkData.duplicatesFound) {
+          const useExisting = confirm(
+            `${checkData.matchCount} of ${checkData.totalUploaded} images already exist in dataset "${checkData.existingDataset.name}".\n\n` +
+            `Status: ${checkData.existingDataset.status}\n` +
+            `Images: ${checkData.existingDataset.imageCount}\n\n` +
+            `Click OK to use the existing dataset, or Cancel to upload as new.`
+          );
+
+          if (useExisting) {
+            DATASET_ID = checkData.existingDataset.id;
+            showStatus(uploadStatus, `Using existing dataset: ${checkData.existingDataset.name}`, 'success');
+            selectedFiles = [];
+            updateFileList();
+            uploadBtn.disabled = false;
+            return;
+          }
+        }
+      }
+      catch(err){
+        console.log('error saving')
+      }
       showStatus(uploadStatus, `Uploading ${selectedFiles.length} files...`, 'info');
 
       try {

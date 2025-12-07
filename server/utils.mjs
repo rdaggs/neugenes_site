@@ -1,14 +1,17 @@
 // utils.mjs
 import path from 'path'
+import { spawn } from 'child_process'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { ProcessingHandler } from './processing-handler.mjs'
 import { Dataset, ImageAttr } from './db.mjs'
 
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const DATASET_PROCESSED_DIR = path.join(__dirname, '../neugenes/dataset_processed')
+const HEATMAP_GENERATOR = path.join(__dirname, '../neugenes/processing-scripts/manual-heatmap')
 
 const processingHandler = new ProcessingHandler({
     fastApiUrl: process.env.FASTAPI_URL || 'http://localhost:8000',
@@ -98,13 +101,11 @@ export async function generateHeatmap(datasetId) {
         }
         else {
             // Fallback to default location
-            console.log(`fallback result used. r_n.csv dne for ${datasetId}`)
-            csvPath = path.join(DATASET_PROCESSED_DIR, 'result_norm.csv')
+            console.log(`fallback result used. result_norm.csv dne for ${datasetId}`)
+            csvPath = path.join(DATASET_PROCESSED_DIR, `${datasetId}/result_norm.csv`)
         }
         if (!fs.existsSync(csvPath)) {
             throw new Error(`csv not found at ${csvPath}`)
-            const filesInDir = fs.readdirSync(DATASET_PROCESSED_DIR)
-            console.log('Files in dataset_processed directory:', filesInDir)
         }
 
         console.log(`generating heatmap for dataset ${datasetId} with ${csvPath}`)
@@ -121,7 +122,7 @@ export async function generateHeatmap(datasetId) {
             // python output
             let stdoutData = ''
             let stderrData = ''
-            const heatmapPath = path.join(DATASET_PROCESSED_DIR, 'result_norm.png')
+            const heatmapPath = path.join(DATASET_PROCESSED_DIR, `${datasetId}/result_norm.png`)
             console.log('heatmapPath', heatmapPath)
 
 

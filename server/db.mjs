@@ -1,5 +1,6 @@
 //db.mjs
 import mongoose from 'mongoose';
+import crypto from 'crypto'
 import { GridFSBucket } from 'mongodb';
 import sharp from 'sharp';
 import dotenv from 'dotenv';
@@ -87,6 +88,7 @@ const imageSchema = mongoose.Schema({
     originalName: { type: String, required: true, trim: true },
     storedName: { type: String, required: true, unique: true },
     gridFsId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
+    checksum: { type: String, index: true },
 
     // image details 
     mimeType: { type: String, required: true, enum: ['image/png', 'image/jpeg', 'image/jpg', 'image/tiff', 'image/tif'] },
@@ -278,6 +280,25 @@ export async function storeImage(file, options = {}) {
             throw new Error(`image validation failed: ${validation.errors.join(', ')}`)
         }
 
+        // Calculate checksum FIRST
+        const fileBuffer = fs.readFileSync(file.path)
+        const checksum = crypto.createHash('md5').update(fileBuffer).digest('hex')
+
+        // Check for existing image with same checksum
+        const existing = await ImageAttr.findOne({ checksum })
+        if (existing) {
+            // Clean up temp file
+            try {
+                if (fs.existsSync(file.path)) fs.unlinkSync(file.path)
+            } catch (e) {}
+            
+            return { 
+                imageId: existing._id, 
+                alreadyExists: true,
+                existingDatasetId: existing.datasetId
+            }
+        }
+
         // extract image metadata
         const metadata = await sharp(file.path).metadata()
 
@@ -291,6 +312,7 @@ export async function storeImage(file, options = {}) {
             originalName: file.originalname,
             storedName: gridFSResult.originalName,
             gridFsId: gridFSResult.fileId,
+            checksum: checksum,
 
             // metadata
             mimeType: file.mimetype,
@@ -631,33 +653,57 @@ export async function getImageFromGridFS(gridFsId, outputPath = null) {
     }
 }
 
-export async function loadMockDataset(mockFilePath = '../mock_dataset.json') {
-    try {
-        const fullPath = path.join(__dirname, mockFilePath)
-        
-        if (!fs.existsSync(fullPath)) {
-            console.warn(`Mock dataset file not found at ${fullPath}`)
-            return null
-        }
-
-        const mockData = JSON.parse(fs.readFileSync(fullPath, 'utf8'))
-        
-        // Check if dataset already exists
-        const existing = await Dataset.findById(mockData._id)
-        if (existing) {
-            console.log(`Mock dataset ${mockData._id} already exists, skipping...`)
-            return existing
-        }
-
-        // Insert the mock dataset
-        const dataset = await Dataset.create(mockData)
-        console.log(`✓ Mock dataset loaded: ${dataset._id} - ${dataset.name}`)
-        return dataset
-
-    } catch (error) {
-        console.error('Error loading mock dataset:', error)
+// Add this function to db.mjs
+export async function findExistingDatasetForImages(files) {
+    const checksums = []
+    
+    for (const file of files) {
+        const fileBuffer = fs.readFileSync(file.path)
+        const hash = crypto.createHash('md5').update(fileBuffer).digest('hex')
+        checksums.push(hash)
+    }
+    
+    // Find images with matching checksums
+    const existingImages = await ImageAttr.find({
+        checksum: { $in: checksums }
+    })
+    
+    if (existingImages.length === 0) {
         return null
     }
+    
+    // Group by datasetId and find the dataset with most matches
+    const datasetCounts = {}
+    for (const img of existingImages) {
+        const dsId = img.datasetId?.toString()
+        if (dsId) {
+            datasetCounts[dsId] = (datasetCounts[dsId] || 0) + 1
+        }
+    }
+    
+    // Find dataset with highest match count
+    let bestMatch = null
+    let maxCount = 0
+    for (const [dsId, count] of Object.entries(datasetCounts)) {
+        if (count > maxCount) {
+            maxCount = count
+            bestMatch = dsId
+        }
+    }
+    
+    if (bestMatch && maxCount > 0) {
+        const dataset = await Dataset.findById(bestMatch)
+        return {
+            dataset,
+            matchCount: maxCount,
+            totalUploaded: files.length,
+            matchingChecksums: checksums.filter(c => 
+                existingImages.some(img => img.checksum === c)
+            )
+        }
+    }
+    
+    return null
 }
 
 // export async function cleanupOrphanedFiles() { }
