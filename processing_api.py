@@ -241,6 +241,14 @@ async def run_processing_pipeline(job_id: str, dataset_id: str, params: Processi
                 ring_width=params.ring_width,
                 z_threshold=params.z_threshold
             )
+            for csv_file in temp_dir.glob("**/*.csv"):
+                dest = output_dir / csv_file.name
+                print(f"Copying {csv_file} to {dest}")
+                shutil.copy2(csv_file, dest)
+                if "norm" in csv_file.name.lower():
+                    result_norm_csv_path = str(csv_file.name)
+                else:
+                    result_csv_path = str(csv_file.name)
             
             update_job(job_id, progress=80, message="Processing complete, saving results...")
             
