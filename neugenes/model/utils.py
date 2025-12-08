@@ -193,7 +193,6 @@ def process_image(image,
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     threshold = dynamic_threshold_value(gray, threshold_scale)
-    print('threshold=', threshold)
     _, threshold_for_contour = cv2.threshold(gray, threshold, 255, cv2.THRESH_TOZERO)
     contours, _ = cv2.findContours(threshold_for_contour, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 

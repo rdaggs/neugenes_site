@@ -1,3 +1,4 @@
+# neugenes/processing-scripts/generate_histogram.py
 #!/usr/bin/env python3
 """
 Brain Region CSV Processor and Histogram Generator

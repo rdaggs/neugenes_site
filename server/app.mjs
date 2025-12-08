@@ -390,7 +390,30 @@ app.post('/process_dataset', async (req, res) => {
                     'results.completedAt': new Date()
                 })
                 console.log(`Dataset ${datasetId} processing completed`)
-            } else {
+
+                try {
+                    console.log(`Generating heatmap for dataset: ${datasetId}`)
+                    const heatmapResult = await generateHeatmap(datasetId)
+                    console.log(`Heatmap generated: ${heatmapResult.heatmapPath}`)
+                } 
+                catch (heatmapError) {
+                    console.error(`Failed to generate heatmap for ${datasetId}:`, heatmapError.message)
+                }
+
+                // Generate histograms
+                try {
+                    console.log(`Generating histograms for dataset: ${datasetId}`)
+                    await generateHistogram(datasetId, true, {})
+                    const dataset = await Dataset.findById(datasetId)
+                    const renormParams = dataset?.parameters?.renorm || {}
+                    await generateHistogram(datasetId, false, renormParams)
+                    console.log(`Histograms generated for ${datasetId}`)
+                } 
+                catch (histogramError) {
+                    console.error(`Failed to generate histograms for ${datasetId}:`, histogramError.message)
+                }
+            } 
+            else {
                 await Dataset.findByIdAndUpdate(datasetId, {
                     status: 'failed',
                     'results.error': result.error,
@@ -500,150 +523,292 @@ app.get('/results_page', (req, res) => {
 
 app.use('/results', express.static(DATASET_PROCESSED_DIR))
 
+// app.get('/api/result_heatmap', async (req, res) => {
+//     let datasetId = req.query.datasetId
+//     try {
+//         if (!datasetId) {
+//             return res.status(400).json({
+//                 success: false,
+//                 error: 'datasetId is required'
+//             })
+//         }
+
+//         const dataset = await Dataset.findById(datasetId)
+//         if (!dataset) {
+//             return res.status(404).json({
+//                 success: false,
+//                 error: 'dataset not found'
+//             })
+//         }
+
+//         if (dataset.results.heatmapPath && fs.existsSync(dataset.results.heatmapPath)) {
+//             const relativePath = path.relative(DATASET_PROCESSED_DIR, dataset.results.heatmapPath)
+//             console.log('relativePath=',relativePath)
+//             return res.json({
+//                 success: true,
+//                 heatMapPath: `/results/${relativePath}`,
+//                 alreadyExists: true
+//             })
+//         }
+
+//         const relativePath = path.relative(DATASET_PROCESSED_DIR, result.heatmapPath)
+
+//         await Dataset.findByIdAndUpdate(datasetId, {
+//             $set: { 'results.heatmapPath': relativePath }
+//         })
+
+//         if (!fs.existsSync(result.heatmapPath)) {
+//             return res.status(404).json({
+//                 success: false,
+//                 error: 'result_norm.png (heatmap) not found. Please process the dataset first.'
+//             })
+//         }
+
+//         res.json({
+//             success: true,
+//             heatMapPath: `/results/${relativePath}`
+//         })
+//     } catch (error) {
+//         console.error('Error finding heatmap:', error)
+//         res.status(500).json({
+//             success: false,
+//             error: error.message
+//         })
+//     }
+// })
+
+// app.get('/api/histogram_raw', async (req, res) => {
+//     try {
+//         const datasetId = req.query.datasetId
+
+//         if (!datasetId) {
+//             return res.status(400).json({
+//                 success: false,
+//                 error: 'datasetId is required'
+//             })
+//         }
+
+//         const dataset = await Dataset.findById(datasetId)
+//         if (!dataset) {
+//             return res.status(404).json({
+//                 success: false,
+//                 error: 'Dataset not found'
+//             })
+//         }
+
+//         if (dataset.results?.histogramRawPath && fs.existsSync(dataset.results.histogramRawPath)) {
+//             const relativePath = path.relative(DATASET_PROCESSED_DIR, dataset.results.histogramRawPath)
+//             return res.json({
+//                 success: true,
+//                 histogramPath: `/results/${relativePath}`,
+//                 alreadyExists: true
+//             })
+//         }
+
+//         const result = await generateHistogram(datasetId, true, {})
+//         const relativePath = path.relative(DATASET_PROCESSED_DIR, result.histogramPath)
+
+//         res.json({
+//             success: true,
+//             histogramPath: `/results/${relativePath}`
+//         })
+//     } catch (error) {
+//         console.error('Error finding/generating raw histogram:', error)
+//         res.status(500).json({
+//             success: false,
+//             error: error.message
+//         })
+//     }
+// })
+
+// app.get('/api/histogram_norm', async (req, res) => {
+//     try {
+//         const datasetId = req.query.datasetId
+
+//         if (!datasetId) {
+//             return res.status(400).json({
+//                 success: false,
+//                 error: 'datasetId is required'
+//             })
+//         }
+
+//         const dataset = await Dataset.findById(datasetId)
+//         if (!dataset) {
+//             return res.status(404).json({
+//                 success: false,
+//                 error: 'Dataset not found'
+//             })
+//         }
+
+//         if (dataset.results?.histogramNormPath && fs.existsSync(dataset.results.histogramNormPath)) {
+//             const relativePath = path.relative(DATASET_PROCESSED_DIR, dataset.results.histogramNormPath)
+//             return res.json({
+//                 success: true,
+//                 histogramPath: `/results/${relativePath}`,
+//                 alreadyExists: true
+//             })
+//         }
+
+//         const renormParams = dataset.parameters?.renorm || { z_score: 2 }
+//         const result = await generateHistogram(datasetId, false, renormParams)
+//         const relativePath = path.relative(DATASET_PROCESSED_DIR, result.histogramPath)
+
+//         res.json({
+//             success: true,
+//             histogramPath: `/results/${relativePath}`
+//         })
+//     } catch (error) {
+//         console.error('Error finding/generating normalized histogram:', error)
+//         res.status(500).json({
+//             success: false,
+//             error: error.message
+//         })
+//     }
+// })
 app.get('/api/result_heatmap', async (req, res) => {
-    let datasetId = req.query.datasetId
+    const datasetId = req.query.datasetId
     try {
         if (!datasetId) {
-            return res.status(400).json({
-                success: false,
-                error: 'datasetId is required'
-            })
+            return res.status(400).json({ success: false, error: 'datasetId is required' })
         }
 
         const dataset = await Dataset.findById(datasetId)
         if (!dataset) {
-            return res.status(404).json({
-                success: false,
-                error: 'dataset not found'
-            })
+            return res.status(404).json({ success: false, error: 'Dataset not found' })
         }
 
-        if (dataset.results.heatmapPath && fs.existsSync(dataset.results.heatmapPath)) {
-            const relativePath = path.relative(DATASET_PROCESSED_DIR, dataset.results.heatmapPath)
-            console.log('relativePath=',relativePath)
+        // Check if stored path exists
+        if (dataset.results?.heatmapPath) {
+            const fullPath = path.join(DATASET_PROCESSED_DIR, dataset.results.heatmapPath)
+            if (fs.existsSync(fullPath)) {
+                return res.json({
+                    success: true,
+                    heatMapPath: `/results/${dataset.results.heatmapPath}`,
+                    alreadyExists: true
+                })
+            }
+        }
+
+        // Fallback: check default location
+        const defaultPath = path.join(DATASET_PROCESSED_DIR, datasetId, 'result_norm.png')
+        if (fs.existsSync(defaultPath)) {
+            // Update database with found path
+            const relativePath = `${datasetId}/result_norm.png`
+            await Dataset.findByIdAndUpdate(datasetId, {
+                $set: { 'results.heatmapPath': relativePath }
+            })
             return res.json({
                 success: true,
-                heatMapPath: `/results/${relativePath}`,
-                alreadyExists: true
+                heatMapPath: `/results/${relativePath}`
             })
         }
 
-        const result = await generateHeatmap(datasetId)
-        const relativePath = path.relative(DATASET_PROCESSED_DIR, result.heatmapPath)
-
-        await Dataset.findByIdAndUpdate(datasetId, {
-            $set: { 'results.heatmapPath': relativePath }
-        })
-
-        if (!fs.existsSync(result.heatmapPath)) {
-            return res.status(404).json({
-                success: false,
-                error: 'heatmap.png image not found. Please process the dataset first.'
-            })
-        }
-
-        res.json({
-            success: true,
-            heatMapPath: `/results/${relativePath}`
+        // Not ready yet
+        return res.status(404).json({
+            success: false,
+            error: 'Heatmap not ready yet. Please wait for processing to complete.'
         })
     } catch (error) {
         console.error('Error finding heatmap:', error)
-        res.status(500).json({
-            success: false,
-            error: error.message
-        })
+        res.status(500).json({ success: false, error: error.message })
     }
 })
 
 app.get('/api/histogram_raw', async (req, res) => {
+    const datasetId = req.query.datasetId
     try {
-        const datasetId = req.query.datasetId
-
         if (!datasetId) {
-            return res.status(400).json({
-                success: false,
-                error: 'datasetId is required'
-            })
+            return res.status(400).json({ success: false, error: 'datasetId is required' })
         }
 
         const dataset = await Dataset.findById(datasetId)
         if (!dataset) {
-            return res.status(404).json({
-                success: false,
-                error: 'Dataset not found'
-            })
+            return res.status(404).json({ success: false, error: 'Dataset not found' })
         }
 
-        if (dataset.results?.histogramRawPath && fs.existsSync(dataset.results.histogramRawPath)) {
-            const relativePath = path.relative(DATASET_PROCESSED_DIR, dataset.results.histogramRawPath)
+        // Check if stored path exists
+        if (dataset.results?.histogramRawPath) {
+            const fullPath = path.join(DATASET_PROCESSED_DIR, dataset.results.histogramRawPath)
+            if (fs.existsSync(fullPath)) {
+                return res.json({
+                    success: true,
+                    histogramPath: `/results/${dataset.results.histogramRawPath}`,
+                    alreadyExists: true
+                })
+            }
+        }
+
+        // Fallback: check default location
+        const defaultPath = path.join(DATASET_PROCESSED_DIR, datasetId, 'histogram_raw.png')
+        if (fs.existsSync(defaultPath)) {
+            const relativePath = `${datasetId}/histogram_raw.png`
+            await Dataset.findByIdAndUpdate(datasetId, {
+                $set: { 'results.histogramRawPath': relativePath }
+            })
             return res.json({
                 success: true,
-                histogramPath: `/results/${relativePath}`,
-                alreadyExists: true
+                histogramPath: `/results/${relativePath}`
             })
         }
 
-        const result = await generateHistogram(datasetId, true, {})
-        const relativePath = path.relative(DATASET_PROCESSED_DIR, result.histogramPath)
-
-        res.json({
-            success: true,
-            histogramPath: `/results/${relativePath}`
+        // Not ready yet
+        return res.status(404).json({
+            success: false,
+            error: 'Raw histogram not ready yet. Please wait for processing to complete.'
         })
     } catch (error) {
-        console.error('Error finding/generating raw histogram:', error)
-        res.status(500).json({
-            success: false,
-            error: error.message
-        })
+        console.error('Error finding raw histogram:', error)
+        res.status(500).json({ success: false, error: error.message })
     }
 })
 
 app.get('/api/histogram_norm', async (req, res) => {
+    const datasetId = req.query.datasetId
     try {
-        const datasetId = req.query.datasetId
-
         if (!datasetId) {
-            return res.status(400).json({
-                success: false,
-                error: 'datasetId is required'
-            })
+            return res.status(400).json({ success: false, error: 'datasetId is required' })
         }
 
         const dataset = await Dataset.findById(datasetId)
         if (!dataset) {
-            return res.status(404).json({
-                success: false,
-                error: 'Dataset not found'
-            })
+            return res.status(404).json({ success: false, error: 'Dataset not found' })
         }
 
-        if (dataset.results?.histogramNormPath && fs.existsSync(dataset.results.histogramNormPath)) {
-            const relativePath = path.relative(DATASET_PROCESSED_DIR, dataset.results.histogramNormPath)
+        // Check if stored path exists
+        if (dataset.results?.histogramNormPath) {
+            const fullPath = path.join(DATASET_PROCESSED_DIR, dataset.results.histogramNormPath)
+            if (fs.existsSync(fullPath)) {
+                return res.json({
+                    success: true,
+                    histogramPath: `/results/${dataset.results.histogramNormPath}`,
+                    alreadyExists: true
+                })
+            }
+        }
+
+        // Fallback: check default location
+        const defaultPath = path.join(DATASET_PROCESSED_DIR, datasetId, 'histogram_norm.png')
+        if (fs.existsSync(defaultPath)) {
+            const relativePath = `${datasetId}/histogram_norm.png`
+            await Dataset.findByIdAndUpdate(datasetId, {
+                $set: { 'results.histogramNormPath': relativePath }
+            })
             return res.json({
                 success: true,
-                histogramPath: `/results/${relativePath}`,
-                alreadyExists: true
+                histogramPath: `/results/${relativePath}`
             })
         }
 
-        const renormParams = dataset.parameters?.renorm || { z_score: 2 }
-        const result = await generateHistogram(datasetId, false, renormParams)
-        const relativePath = path.relative(DATASET_PROCESSED_DIR, result.histogramPath)
-
-        res.json({
-            success: true,
-            histogramPath: `/results/${relativePath}`
+        // Not ready yet
+        return res.status(404).json({
+            success: false,
+            error: 'Normalized histogram not ready yet. Please wait for processing to complete.'
         })
     } catch (error) {
-        console.error('Error finding/generating normalized histogram:', error)
-        res.status(500).json({
-            success: false,
-            error: error.message
-        })
+        console.error('Error finding normalized histogram:', error)
+        res.status(500).json({ success: false, error: error.message })
     }
 })
-
 app.get('/config', (req, res) => {
     res.json({
         MAX_SIZE_MB: IMG_MAX,

@@ -93,29 +93,25 @@ export async function generateHeatmap(datasetId) {
             throw new Error(`dataset with id:${datasetId} dne`)
         }
 
-        // check if csv exists 
+        // Check if csv exists 
         let csvPath;
-        if (dataset.results.result_norm_csv_path) {
-            console.log('using result_norm_csv_path')
-            csvPath = dataset.results.csvPathNorm;
-        }
-        else {
+        if (dataset.results?.csvNormPath) {
+            console.log('using csvNormPath from dataset')
+            csvPath = path.join(DATASET_PROCESSED_DIR, dataset.results.csvNormPath)
+        } else {
             // Fallback to default location
             console.log(`fallback result used. result_norm.csv dne for ${datasetId}`)
-            csvPath = path.join(DATASET_PROCESSED_DIR, `${datasetId}/result_norm.csv`)
-        }
-        if (!fs.existsSync(csvPath)) {
-            throw new Error(`csv not found at ${csvPath}`)
+            csvPath = path.join(DATASET_PROCESSED_DIR, datasetId, 'result_norm.csv')
         }
 
         console.log(`generating heatmap for dataset ${datasetId} with ${csvPath}`)
 
         return new Promise((resolve, reject) => {
-
+            const outputPath = path.join(DATASET_PROCESSED_DIR, datasetId, 'result_norm.png')
             const heatmapProcess = spawn('python', [
                 path.join(HEATMAP_GENERATOR, 'generate_heatmap_per_dataset.py'),
                 path.join(DATASET_PROCESSED_DIR, 'result_norm.csv'),
-                '--output', path.join(DATASET_PROCESSED_DIR, 'result_norm.png')
+                '--output', outputPath
             ])
 
 
@@ -123,8 +119,6 @@ export async function generateHeatmap(datasetId) {
             let stdoutData = ''
             let stderrData = ''
             const heatmapPath = path.join(DATASET_PROCESSED_DIR, `${datasetId}/result_norm.png`)
-            console.log('heatmapPath', heatmapPath)
-
 
             heatmapProcess.stdout.on('data', (data) => {
                 const output = data.toString()
@@ -151,6 +145,7 @@ export async function generateHeatmap(datasetId) {
                                 'results.heatmap_path': heatmapPath
                             }
                         })
+                        console.log('results.heatmap_path', heatmapPath)
                         console.log(`updated dataset ${datasetId} with heatmap path: ${heatmapPath}`)
                     }
                     catch (updateError) {

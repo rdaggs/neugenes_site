@@ -437,7 +437,7 @@ async def generate_histogram(dataset_id: str, request: HistogramRequest = Histog
         full_csv_path = Config.OUTPUT_DIR / csv_path
         output_dir = Config.OUTPUT_DIR / dataset_id
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_image_path = output_dir / output_filename
+        output_image_path = output_dir / dataset_id / output_filename
         
         if not full_csv_path.exists():
             raise HTTPException(status_code=404, detail=f"CSV file not found: {csv_path}")
@@ -516,7 +516,7 @@ async def generate_heatmap(dataset_id: str):
         full_csv_path = Config.OUTPUT_DIR / csv_path
         output_dir = Config.OUTPUT_DIR / dataset_id
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_image_path = output_dir / "heatmap.png"
+        output_image_path = output_dir /dataset_id / "result_norm.png"
         
         if not full_csv_path.exists():
             raise HTTPException(status_code=404, detail=f"CSV file not found: {csv_path}")
