@@ -53,20 +53,21 @@ const datasetSchema = mongoose.Schema({
 
     // given
     name: { type: String, required: true, trim: true },
+    status: { type: String, default: 'pending' },
     descrption: String,
     createdBy: String,
     parameters: {
         experiment_name: String,
-        structureAcronyms: [String],
-        dotCount: { type: Boolean, default: false },
-        expressionIntensity: { type: Boolean, default: false },
-        thresholdScale: { type: Number, default: 1.0 },
-        layerInTiff: { type: Number, default: 1 },
-        patchSize: { type: Number, default: 7 },
-        ringWidth: { type: Number, default: 3 },
-        zThreshold: { type: Number, default: 1.2 }
+        structure_acronymns: [String],
+        dot_count: { type: Boolean, default: false },
+        expression_intensity: { type: Boolean, default: false },
+        threshold_scale: { type: Number, default: 1.0 },
+        layer_in_tiff: { type: Number, default: 1 },
+        patch_size: { type: Number, default: 7 },
+        ring_width: { type: Number, default: 3 },
+        z_threshold: { type: Number, default: 1.2 }
     },
-
+    
     images: [{
         fileId: mongoose.Schema.Types.ObjectId,
         filename: String,

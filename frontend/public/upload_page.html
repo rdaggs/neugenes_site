@@ -791,12 +791,12 @@
 
     // ===================== PARAMETERS =====================
     saveParamsBtn.addEventListener('click', async () => {
-      const selectedIds = getSelectedStructureIds();
+       const selectedAcronyms = getSelectedStructureAcronyms()
 
       const payload = {
         datasetId: DATASET_ID,
         experiment_name: document.getElementById('experimentName').value,
-        selected_structure_ids: selectedIds.length > 0 ? selectedIds : [],
+        structure_acronymns: selectedAcronyms.length > 0 ? selectedAcronyms : ['FULL_BRAIN'],
         dot_count: document.getElementById('dotCount').checked,
         expression_intensity: document.getElementById('expressionIntensity').checked,
         threshold_scale: parseFloat(document.getElementById('thresholdScale').value),
@@ -805,6 +805,7 @@
         ring_width: parseInt(document.getElementById('ringWidth').value),
         z_threshold: parseFloat(document.getElementById('zThreshold').value)
       };
+      console.log('payload',payload)
 
       // send parameters in JSON body to backend
       const res = await fetch('/accept_dataset_parameters', {
@@ -821,42 +822,75 @@
 
 
     //==================== PROCESS FUNCTION ====================//
-    processBtn.addEventListener('click', async () => {
-      //processDatasetBtn.disabled = true
-      showStatus(processStatus, 'running algorithm...', 'info')
 
-      try {
+async function pollUntilComplete(datasetId) {
+  const POLL_INTERVAL = 2000
 
-        const res = await fetch('/process_dataset', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ datasetId: DATASET_ID })
-        })
+  while (true) {
+    const response = await fetch(`/api/processing_status/${datasetId}`)
+    const data = await response.json()
 
-        const data = await res.json()
+    if (data.status === 'completed') {
+      return data
+    }
 
-        console.log('res status', res.status)
-        console.log('res ok', res.ok)
+    if (data.status === 'failed') {
+      throw new Error(data.results?.error || 'Processing failed')
+    }
 
-        if (data.success) {
-          showStatus(processStatus, `Processing complete: ${data.message}. Redirecting...`, 'success')
+    showStatus(processStatus, `Processing... (${data.status})`, 'info')
 
-          // redirect to results page after processing is complete to view output
-          setTimeout(() => {
-            window.location.href = `/results_page?datasetId=${DATASET_ID}`
-          }, 1500)
-        }
-        else {
-          showStatus(processStatus, `Error: ${data.error}`, 'error')
-        }
-      }
-      catch (error) {
-        showStatus(processStatus, `Processing failed: ${error.message}`, 'error')
-      }
-      finally {
-        processBtn.disabled = false
-      }
+    await new Promise(r => setTimeout(r, POLL_INTERVAL))
+  }
+}
+
+processBtn.addEventListener('click', async () => {
+  if (!DATASET_ID) {
+    showStatus(processStatus, 'Please upload a dataset first.', 'error')
+    return
+  }
+
+  processBtn.disabled = true
+  loadingContainer.style.display = 'block'
+  loadingBar.style.width = '30%'
+  showStatus(processStatus, 'Starting processing...', 'info')
+
+  try {
+    // Start processing
+    const res = await fetch('/process_dataset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ datasetId: DATASET_ID })
     })
+
+    const data = await res.json()
+
+    if (!data.success) {
+      throw new Error(data.error)
+    }
+
+    loadingBar.style.width = '50%'
+    showStatus(processStatus, 'Processing images...', 'info')
+
+    // Poll until complete
+    await pollUntilComplete(DATASET_ID)
+
+    loadingBar.style.width = '100%'
+    loadingBar.style.background = 'var(--accent-success)'
+    showStatus(processStatus, 'Processing complete! Redirecting...', 'success')
+
+    // Redirect to results page
+    setTimeout(() => {
+      window.location.href = `/results_page?datasetId=${DATASET_ID}`
+    }, 1000)
+
+  } catch (error) {
+    loadingBar.style.width = '100%'
+    loadingBar.style.background = 'var(--accent-coral)'
+    showStatus(processStatus, `Processing failed: ${error.message}`, 'error')
+    processBtn.disabled = false
+  }
+})
 
     //====================== RESULTS PAGE ======================//
     viewResultsBtn.addEventListener('click', () => {
@@ -995,6 +1029,21 @@
         node.children.forEach((child) => updateSelectedIds(child, isChecked));
       }
     }
+    function getSelectedStructureAcronyms() {
+      const acronyms = []
+      function collectAcronyms(node) {
+          if (node.checked) {
+              acronyms.push(node.acronym)
+          }
+          if (node.children) {
+              node.children.forEach(child => collectAcronyms(child))
+          }
+      }
+      if (brainTreeData) {
+          collectAcronyms(brainTreeData)
+      }
+      return acronyms
+  }
 
     // Render the full tree
     function renderBrainTree() {

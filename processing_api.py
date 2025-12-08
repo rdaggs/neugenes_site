@@ -241,6 +241,8 @@ async def run_processing_pipeline(job_id: str, dataset_id: str, params: Processi
                 ring_width=params.ring_width,
                 z_threshold=params.z_threshold
             )
+            print('expression_intensity',params.expression_intensity)
+            print('structure_acronymns',structure_acronyms)
             for csv_file in temp_dir.glob("**/*.csv"):
                 dest = output_dir / csv_file.name
                 print(f"Copying {csv_file} to {dest}")
