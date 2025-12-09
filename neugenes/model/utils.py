@@ -614,7 +614,7 @@ def process_mask(structure_id,alignment,image):
         restructured_coords = np.column_stack((cords[0], cords[1]))
 
     except HTTPError as http_err:
-        print(f"HTTP error for structure {structure_id}: {http_err}")
+        print(f"HTTP error for structure {structure_id}...likely not in atlas")
         restructured_coords = np.empty((0, 2))
         slice_resize = np.zeros_like(image, dtype=np.uint8)
         slice = np.zeros_like(image, dtype=np.uint8)
