@@ -396,24 +396,28 @@
       margin-bottom: 1.5rem;
     }
 
-    /* Loading Bar */
+    /* Loading Bar (text-based + / -) */
     .loading-container {
       width: 100%;
       max-width: 500px;
-      height: 12px;
-      background: #f0eded;
-      border-radius: 6px;
       margin: 1.5rem auto;
-      overflow: hidden;
       display: none;
+      text-align: center;
     }
 
-    .loading-bar {
-      height: 100%;
-      width: 0%;
-      background: #c53b3b;
-      border-radius: 6px;
-      transition: width 0.5s ease, background-color 1s ease;
+    .loading-text {
+      font-family: "DM Sans", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+        "Liberation Mono", "Courier New", monospace;
+      letter-spacing: 0.15em;
+      font-size: 0.95rem;
+    }
+
+    .loading-text .plus {
+      color: var(--accent-success);
+    }
+
+    .loading-text .minus {
+      color: var(--accent-coral);
     }
 
     .processing-buttons {
@@ -573,7 +577,7 @@
         process.</p>
 
       <div class="loading-container" id="loadingContainer">
-        <div class="loading-bar" id="loadingBar"></div>
+        <span id="loadingText" class="loading-text"></span>
       </div>
 
       <p id="processStatus" class="status"></p>
@@ -616,8 +620,10 @@
     const paramsStatus = document.getElementById('paramsStatus');
     const processBtn = document.getElementById('processBtn');
     const processStatus = document.getElementById('processStatus');
+    //const loadingContainer = document.getElementById('loadingContainer');
+    //const loadingBar = document.getElementById('loadingBar');
     const loadingContainer = document.getElementById('loadingContainer');
-    const loadingBar = document.getElementById('loadingBar');
+    const loadingText = document.getElementById('loadingText');
     const viewResultsBtn = document.getElementById('viewResultsBtn');
 
     // ===================== FILE UPLOAD LOGIC =====================
@@ -739,10 +745,10 @@
           method: 'POST',
           body: formData
         });
-        
+
         const checkData = await checkRes.json();
         const datasetName = checkData.existingDataset.parameters?.experiment_name || checkData.existingDataset.name || 'Unnamed Dataset';
-        
+
 
         if (checkData.duplicatesFound) {
           const useExisting = confirm(
@@ -762,7 +768,7 @@
           }
         }
       }
-      catch(err){
+      catch (err) {
         console.log('error saving')
       }
       showStatus(uploadStatus, `Uploading ${selectedFiles.length} files...`, 'info');
@@ -791,7 +797,7 @@
 
     // ===================== PARAMETERS =====================
     saveParamsBtn.addEventListener('click', async () => {
-       const selectedAcronyms = getSelectedStructureAcronyms()
+      const selectedAcronyms = getSelectedStructureAcronyms()
 
       const payload = {
         datasetId: DATASET_ID,
@@ -805,7 +811,7 @@
         ring_width: parseInt(document.getElementById('ringWidth').value),
         z_threshold: parseFloat(document.getElementById('zThreshold').value)
       };
-      console.log('payload',payload)
+      console.log('payload', payload)
 
       // send parameters in JSON body to backend
       const res = await fetch('/accept_dataset_parameters', {
@@ -823,74 +829,70 @@
 
     //==================== PROCESS FUNCTION ====================//
 
-async function pollUntilComplete(datasetId) {
-  const POLL_INTERVAL = 2000
+    async function pollUntilComplete(datasetId) {
+      const POLL_INTERVAL = 2000
 
-  while (true) {
-    const response = await fetch(`/api/processing_status/${datasetId}`)
-    const data = await response.json()
+      while (true) {
+        const response = await fetch(`/api/processing_status/${datasetId}`)
+        const data = await response.json()
 
-    if (data.status === 'completed') {
-      return data
+        if (data.status === 'completed') {
+          return data
+        }
+
+        if (data.status === 'failed') {
+          throw new Error(data.results?.error || 'Processing failed')
+        }
+
+        showStatus(processStatus, `Processing... (${data.status})`, 'info')
+
+        await new Promise(r => setTimeout(r, POLL_INTERVAL))
+      }
     }
 
-    if (data.status === 'failed') {
-      throw new Error(data.results?.error || 'Processing failed')
-    }
+    processBtn.addEventListener('click', async () => {
+      if (!DATASET_ID) {
+        showStatus(processStatus, 'Please upload a dataset first.', 'error')
+        return
+      }
 
-    showStatus(processStatus, `Processing... (${data.status})`, 'info')
+      processBtn.disabled = true
+      startLoadingAnimation()  // Use your text-based animation
+      showStatus(processStatus, 'Processing...', 'info')
 
-    await new Promise(r => setTimeout(r, POLL_INTERVAL))
-  }
-}
+      try {
+        // Start processing
+        const res = await fetch('/process_dataset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ datasetId: DATASET_ID })
+        })
 
-processBtn.addEventListener('click', async () => {
-  if (!DATASET_ID) {
-    showStatus(processStatus, 'Please upload a dataset first.', 'error')
-    return
-  }
+        const data = await res.json()
 
-  processBtn.disabled = true
-  loadingContainer.style.display = 'block'
-  loadingBar.style.width = '30%'
-  showStatus(processStatus, 'Starting processing...', 'info')
+        if (!data.success) {
+          throw new Error(data.error)
+        }
 
-  try {
-    // Start processing
-    const res = await fetch('/process_dataset', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ datasetId: DATASET_ID })
+        showStatus(processStatus, 'Processing images...', 'info')
+
+        // Poll until complete
+        await pollUntilComplete(DATASET_ID)
+
+        stopLoadingAnimation(true)
+        showStatus(processStatus, 'Processing complete! Redirecting...', 'success')
+
+        // Redirect to results page
+        setTimeout(() => {
+          window.location.href = `/results_page?datasetId=${DATASET_ID}`
+        }, 1000)
+
+      } catch (error) {
+        stopLoadingAnimation(true)
+        showStatus(processStatus, `Processing failed: ${error.message}`, 'error')
+        processBtn.disabled = false
+      }
     })
-
-    const data = await res.json()
-
-    if (!data.success) {
-      throw new Error(data.error)
-    }
-
-    loadingBar.style.width = '50%'
-    showStatus(processStatus, 'Processing images...', 'info')
-
-    // Poll until complete
-    await pollUntilComplete(DATASET_ID)
-
-    loadingBar.style.width = '100%'
-    loadingBar.style.background = 'var(--accent-success)'
-    showStatus(processStatus, 'Processing complete! Redirecting...', 'success')
-
-    // Redirect to results page
-    setTimeout(() => {
-      window.location.href = `/results_page?datasetId=${DATASET_ID}`
-    }, 1000)
-
-  } catch (error) {
-    loadingBar.style.width = '100%'
-    loadingBar.style.background = 'var(--accent-coral)'
-    showStatus(processStatus, `Processing failed: ${error.message}`, 'error')
-    processBtn.disabled = false
-  }
-})
 
     //====================== RESULTS PAGE ======================//
     viewResultsBtn.addEventListener('click', () => {
@@ -1032,18 +1034,18 @@ processBtn.addEventListener('click', async () => {
     function getSelectedStructureAcronyms() {
       const acronyms = []
       function collectAcronyms(node) {
-          if (node.checked) {
-              acronyms.push(node.acronym)
-          }
-          if (node.children) {
-              node.children.forEach(child => collectAcronyms(child))
-          }
+        if (node.checked) {
+          acronyms.push(node.acronym)
+        }
+        if (node.children) {
+          node.children.forEach(child => collectAcronyms(child))
+        }
       }
       if (brainTreeData) {
-          collectAcronyms(brainTreeData)
+        collectAcronyms(brainTreeData)
       }
       return acronyms
-  }
+    }
 
     // Render the full tree
     function renderBrainTree() {
@@ -1058,6 +1060,45 @@ processBtn.addEventListener('click', async () => {
     // Helper for saving parameters
     function getSelectedStructureIds() {
       return Array.from(selectedStructureIds);
+    }
+    let loadingInterval = null;
+    const TOTAL_SEGMENTS = 20; // total characters in the bar
+
+    function renderLoadingBar(progressFraction) {
+      const total = TOTAL_SEGMENTS;
+      const filled = Math.round(total * progressFraction);
+      let html = '';
+
+      for (let i = 0; i < total; i++) {
+        if (i < filled) {
+          html += '<span class="plus">+</span>';
+        } else {
+          html += '<span class="minus">-</span>';
+        }
+      }
+      loadingText.innerHTML = html;
+    }
+
+    function startLoadingAnimation() {
+      loadingContainer.style.display = 'block';
+
+      if (loadingInterval) clearInterval(loadingInterval);
+
+      let current = 0;
+      loadingInterval = setInterval(() => {
+        current = (current + 1) % (TOTAL_SEGMENTS + 1);
+        const fraction = current / TOTAL_SEGMENTS;
+        renderLoadingBar(fraction);
+      }, 150); // speed of animation (ms per step)
+    }
+
+    function stopLoadingAnimation(success) {
+      if (loadingInterval) {
+        clearInterval(loadingInterval);
+        loadingInterval = null;
+      }
+      // all green pluses on success, all red dashes on failure
+      renderLoadingBar(success ? 1 : 0);
     }
 
     // Initialize
