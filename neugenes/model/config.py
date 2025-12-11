@@ -24,6 +24,7 @@ tree = mcc.get_structure_tree()
 acronym_map = tree.value_map(lambda x: x['id'], lambda y: y['acronym'])
 name_map = tree.get_name_map() 
 
+
 # Brain atlas structure query 
 names_file_path = os.path.join(root,'model/mcc/names.txt')
 

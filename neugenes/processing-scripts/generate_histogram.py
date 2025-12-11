@@ -136,13 +136,12 @@ def generate_brain_region_histogram(
     apply_normalization: bool = True,
     bar_color: str = 'gray',
     title: Optional[str] = None,
-    xlabel: str = 'GFP Fluorescence (% of region)',
+    xlabel: str = 'Measured Fluorescence Intensity',
     figsize_width: int = 10,
     figsize_height: int = 12,
     verbose: bool = True
 ) -> dict:
     """Generate horizontal bar histogram of brain region expression."""
-    
     try:
         # Load data
         df = pd.read_csv(csv_path)

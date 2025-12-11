@@ -261,7 +261,7 @@
     }
 
     .param-item .param-desc {
-      font-size: 1rem;
+      font-size: 10px;
       color: var(--text-secondary);
       margin-bottom: 0.25rem;
     }
@@ -492,8 +492,8 @@
         <!-- Brain Structures -->
         <div class="section">
           <h2>Brain Structures</h2>
-          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Click to expand regions and
-            select structures for analysis.</p>
+          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Click for all brain regions available
+             for analysis. (if none select, default to full brain)</p>
           <div class="tree-container">
             <div id="brainStructureTree"></div>
           </div>
@@ -531,25 +531,25 @@
             <div class="param-row">
               <div class="param-item">
                 <label for="thresholdScale">Threshold Scale</label>
-                <div class="param-desc">Sensitivity adjustment</div>
+                <div class="param-desc">Scale flourescence expression intensity to be counted as candidate (def = 1.0 most permissive)</div>
                 <input type="number" step="0.1" id="thresholdScale" value="1.0">
               </div>
               <div class="param-item">
                 <label for="layerInTiff">Layer in TIFF</label>
-                <div class="param-desc">Target layer index</div>
+                <div class="param-desc">If input file is tiff stack, select channel (0,1,2) for evaluation (def = 1) </div>
                 <input type="number" id="layerInTiff" value="1">
               </div>
             </div>
 
             <div class="param-row">
               <div class="param-item">
-                <label for="patchSize">Patch Size</label>
-                <div class="param-desc">Detection window size</div>
+                <label for="patchSize">Patch Size = (n x n) pixels </label>
+                <div class="param-desc"> Window for evaluating cell candidate (def = 7x7 pixels) </div>
                 <input type="number" id="patchSize" value="7">
               </div>
               <div class="param-item">
                 <label for="ringWidth">Ring Width</label>
-                <div class="param-desc">Surrounding region width</div>
+                <div class="param-desc"> Background of candidate evaluted from radius of patch + ring width (def = 3 pixels) </div>
                 <input type="number" id="ringWidth" value="3">
               </div>
             </div>
@@ -557,7 +557,7 @@
             <div class="param-row">
               <div class="param-item">
                 <label for="zThreshold">Z Threshold</label>
-                <div class="param-desc">Statistical threshold</div>
+                <div class="param-desc"> (patch_mean - background_mean) / background_std) > z_thresh (acts as min value) </div>
                 <input type="number" step="0.1" id="zThreshold" value="1.2">
               </div>
             </div>

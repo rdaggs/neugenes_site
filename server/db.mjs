@@ -65,7 +65,7 @@ const datasetSchema = mongoose.Schema({
         layer_in_tiff: { type: Number, default: 1 },
         patch_size: { type: Number, default: 7 },
         ring_width: { type: Number, default: 3 },
-        z_threshold: { type: Number, default: 1.2 }
+        z_threshold: { type: Number, default: 1.2 },
     },
     
     images: [{

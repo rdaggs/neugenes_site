@@ -174,55 +174,6 @@ export async function generateHeatmap(datasetId) {
     }
 }
 
-
-
-// export async function generateHistogram(datasetId, raw = true, params = {}) {
-//     console.log(`Generating ${raw ? 'raw' : 'normalized'} histogram for dataset: ${datasetId}`)
-
-//     const dataset = await Dataset.findById(datasetId)
-//     if (!dataset) {
-//         throw new Error(`Dataset ${datasetId} not found`)
-//     }
-
-//     const outputDir = path.join(DATASET_PROCESSED_DIR, datasetId)
-//     if (!fs.existsSync(outputDir)) {
-//         fs.mkdirSync(outputDir, { recursive: true })
-//     }
-
-//     const histogramFilename = raw ? 'histogram_raw.png' : 'histogram_norm.png'
-//     const histogramPath = path.join(outputDir, histogramFilename)
-
-//     try {
-//         const response = await fetch(`http://localhost:8000/visualize/histogram/${datasetId}`, {
-//             method: 'POST',
-//             headers: { 'Content-Type': 'application/json' },
-//             body: JSON.stringify({ raw, ...params })
-//         })
-
-//         if (response.ok) {
-//             const result = await response.json()
-
-//             const updateField = raw ? 'results.histogramRawPath' : 'results.histogramNormPath'
-//             await Dataset.findByIdAndUpdate(datasetId, {
-//                 [updateField]: result.histogram_path || histogramPath
-//             })
-
-//             return {
-//                 success: true,
-//                 histogramPath: result.histogram_path || histogramPath
-//             }
-//         }
-//     } catch (e) {
-//         console.log('FastAPI histogram endpoint not available, using placeholder')
-//     }
-
-//     return {
-//         success: true,
-//         histogramPath: histogramPath,
-//         placeholder: true
-//     }
-// }
-
 export async function generateHistogram(datasetId, raw = true, params = {}) {
     console.log(`Generating ${raw ? 'raw' : 'normalized'} histogram for dataset: ${datasetId}`)
 
@@ -237,7 +188,7 @@ export async function generateHistogram(datasetId, raw = true, params = {}) {
     }
 
     const histogramFilename = raw ? 'histogram_raw.png' : 'histogram_norm.png'
-    const histogramPath = path.join(outputDir, histogramFilename)
+    const histogramPath = `${datasetId}/${histogramFilename}`
 
     const csvFilename = raw ? 'result_raw.csv' : 'result_norm.csv'
     const csvPath = path.join(outputDir, csvFilename)
