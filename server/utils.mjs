@@ -274,18 +274,13 @@ export async function generateHistogram(datasetId, raw = true, params = {}) {
 export async function renormalize(datasetId, renormParams) {
     try {
         console.log(`[RENORMALIZE TEST] Called with datasetId: ${datasetId}`)
-        console.log(`[RENORMALIZE TEST] ${renormParams}`)
-
-        const dataset = await Dataset.findById(datasetId)
-        if (!dataset) {
-            throw new Error(`Dataset ${datasetId} not found`)
-        }
-
-        const csvToRenormalize = dataset.results.csvPath
-
-        // 
-
-
+        console.log(`[RENORMALIZE TEST] Parameters:`, renormParams)
+        
+        // Simulate some async work
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        console.log(`[RENORMALIZE TEST] Completed successfully`)
+        
         return {
             success: true,
             resultNormCsvPath: `${datasetId}/result_norm.csv`,
