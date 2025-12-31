@@ -9,8 +9,8 @@ import { fileURLToPath } from 'url'
 
 // custom functions
 import { APP_CONFIG } from '../config.mjs'
-import { generateHeatmap, generateHistogram, Process } from './utils.mjs'
-import { connectDatabase, Dataset, ImageAttr, storeImage,findExistingDatasetForImages } from './db.mjs'
+import { generateHeatmap, generateHistogram, renormalize } from './utils.mjs'
+import { connectDatabase, Dataset, ImageAttr, storeImage, findExistingDatasetForImages } from './db.mjs'
 import { ProcessingHandler } from './processing-handler.mjs'
 
 dotenv.config()
@@ -175,12 +175,12 @@ app.post('/check_duplicate_images', upload.array('files', IMG_UPLOAD_CEILING), a
         }
 
         const result = await findExistingDatasetForImages(req.files)
-        
+
         // Clean up temp files
         req.files.forEach(file => {
             try {
                 if (fs.existsSync(file.path)) fs.unlinkSync(file.path)
-            } catch (e) {}
+            } catch (e) { }
         })
 
         if (result) {
@@ -272,7 +272,7 @@ app.post('/accept_dataset_parameters', async (req, res) => {
     }
 })
 
-app.post('/accept_renorm_parameters', async (req, res) => {
+app.post('/api/accept_renorm_parameters', async (req, res) => {
     try {
         const {
             datasetId,
@@ -280,6 +280,7 @@ app.post('/accept_renorm_parameters', async (req, res) => {
             normalizationStrength,
             normType,
         } = req.body
+
 
         console.log('Accepting renorm parameters for', datasetId)
 
@@ -300,12 +301,12 @@ app.post('/accept_renorm_parameters', async (req, res) => {
 
         const renormParameters = {
             remove_top_n: parseInt(remove_top_n) || 0,
-            normalizationStrength: parseFloat(normalizationStrength) || 1.0,
-            normType: normType || 'z_score'
+            normalization_strength: parseFloat(normalizationStrength) || 1.0,
+            norm_type: normType || 'z_score'
         }
 
         await Dataset.findByIdAndUpdate(datasetId, {
-            'parameters.renorm': renormParameters
+            'renorm_parameters': renormParameters
         })
 
         console.log(`Renorm parameters saved for dataset: ${dataset._id}`)
@@ -317,6 +318,85 @@ app.post('/accept_renorm_parameters', async (req, res) => {
     } catch (err) {
         console.error('Error parsing renorm parameters:', err)
         res.status(500).json({ success: false, error: 'Failed to save parameters' })
+    }
+})
+
+app.post('/api/renormalize', async (req, res) => {
+    try {
+        const { datasetId } = req.body
+        if (!datasetId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing datasetId'
+            })
+        }
+
+        const dataset = await Dataset.findById(datasetId)
+        if (!dataset) {
+            return res.status(404).json({
+                success: false,
+                error: 'Dataset not found'
+            })
+        }
+
+
+        const renormParams = dataset.renorm_parameters || {
+            remove_top_n: 0.0,
+            normalization_strength: 1.0,
+            norm_type: 'zscore'
+        }
+
+        const isHealthy = await processingHandler.healthCheck()
+        if (!isHealthy) {
+            return res.status(503).json({
+                success: false,
+                error: 'Processing service unavailable'
+            })
+        }
+        console.log(`Renormalizing with parameters for dataset: ${dataset._id}`)
+
+        //=======================renormalize=======================//
+        const renormResult = await renormalize(datasetId, renormParams)
+
+        if (!renormResult.success) {
+            throw new Error(renormResult.error || 'Renormalization failed')
+        }
+
+        await Dataset.findByIdAndUpdate(datasetId, {
+            'results.csvPathRenorm': renormResult.resultNormCsvPath
+        })
+
+        console.log(`Renormalization complete for ${datasetId}`)
+
+        //=======================Regenerate normalized heatmap/histogram=======================//
+        try {
+            await generateHistogram(datasetId, false, renormParams)
+            console.log(`Normalized histogram regenerated for ${datasetId}`)
+        }
+        catch (histError) {
+            console.warn(`Failed to regenerate histogram: ${histError.message}`)
+        }
+        try {
+            await generateHeatmap(datasetId)
+            console.log(`Heatmap regenerated for ${datasetId}`)
+        }
+        catch (heatmapError) {
+            console.warn(`Failed to regenerate heatmap: ${heatmapError.message}`)
+        }
+
+        return res.json({
+            success: true,
+            datasetId: dataset._id,
+            message: 'Renormalization complete'
+        })
+    }
+
+    catch (error) {
+        console.error('Error renormalizing dataset:', error)
+        res.status(500).json({
+            success: false,
+            error: error.message
+        })
     }
 })
 
@@ -397,7 +477,7 @@ app.post('/process_dataset', async (req, res) => {
                     console.log(`Generating heatmap for dataset: ${datasetId}`)
                     const heatmapResult = await generateHeatmap(datasetId)
                     console.log(`Heatmap generated: ${heatmapResult.heatmapPath}`)
-                } 
+                }
                 catch (heatmapError) {
                     console.error(`Failed to generate heatmap for ${datasetId}:`, heatmapError.message)
                 }
@@ -411,11 +491,11 @@ app.post('/process_dataset', async (req, res) => {
                     await generateHistogram(datasetId, true, {})
                     await generateHistogram(datasetId, false, renormParams)
                     console.log(`Histograms generated for ${datasetId}`)
-                } 
+                }
                 catch (histogramError) {
                     console.error(`Failed to generate histograms for ${datasetId}:`, histogramError.message)
                 }
-            } 
+            }
             else {
                 await Dataset.findByIdAndUpdate(datasetId, {
                     status: 'failed',
@@ -673,9 +753,9 @@ app.get('/api/histogram_norm', async (req, res) => {
 async function processAndRedirect(datasetId) {
     const spinner = document.getElementById('loading-spinner')
     const statusText = document.getElementById('status-text')
-    
+
     spinner.style.display = 'block'
-    
+
     try {
         // Start processing
         const response = await fetch('/process_dataset', {
@@ -683,18 +763,18 @@ async function processAndRedirect(datasetId) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ datasetId })
         })
-        
+
         const data = await response.json()
         if (!data.success) throw new Error(data.error)
-        
+
         statusText.textContent = 'Processing images...'
-        
+
         // Poll until done
         await pollUntilComplete(datasetId, statusText)
-        
+
         // Redirect to results
         window.location.href = `/results_page?datasetId=${datasetId}`
-        
+
     } catch (error) {
         spinner.style.display = 'none'
         statusText.textContent = `Error: ${error.message}`
@@ -703,21 +783,21 @@ async function processAndRedirect(datasetId) {
 
 async function pollUntilComplete(datasetId, statusText) {
     const POLL_INTERVAL = 2000
-    
+
     while (true) {
         const response = await fetch(`/api/processing_status/${datasetId}`)
         const data = await response.json()
-        
+
         if (data.status === 'completed') {
             return data
         }
-        
+
         if (data.status === 'failed') {
             throw new Error(data.results?.error || 'Processing failed')
         }
-        
+
         statusText.textContent = `Processing... (${data.status})`
-        
+
         await new Promise(r => setTimeout(r, POLL_INTERVAL))
     }
 }

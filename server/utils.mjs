@@ -269,8 +269,36 @@ export async function generateHistogram(datasetId, raw = true, params = {}) {
         })
     })
 }
+
+export async function renormalize(datasetId, renormParams) {
+    try {
+        console.log(`[RENORMALIZE TEST] Called with datasetId: ${datasetId}`)
+        console.log(`[RENORMALIZE TEST] Parameters:`, renormParams)
+        
+        // Simulate some async work
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        console.log(`[RENORMALIZE TEST] Completed successfully`)
+        
+        return {
+            success: true,
+            resultNormCsvPath: `${datasetId}/result_norm.csv`,
+            message: 'Test renormalization completed'
+        }
+    } 
+    
+    catch (error) {
+        console.error(`[RENORMALIZE TEST] Error:`, error)
+        return {
+            success: false,
+            error: error.message
+        }
+    }
+}
+
 export default {
     Process,
     generateHeatmap,
-    generateHistogram
+    generateHistogram,
+    renormalize
 }

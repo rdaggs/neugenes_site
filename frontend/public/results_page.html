@@ -482,7 +482,7 @@
     async function loadHeatmap() {
       console.log('Fetching heatmap...');
 
-      const response = await fetch(`/api/result_heatmap?datasetId=${DATASET_ID}`);
+      const response = await fetch(`/api/result_heatmap?datasetId=${DATASET_ID}&t=${Date.now()}`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -494,7 +494,8 @@
         throw new Error(data.error || 'Failed to load heatmap');
       }
 
-      document.getElementById('resultImage').src = data.heatMapPath;
+      document.getElementById('resultImage').src = data.heatMapPath + '?t=' + Date.now();
+
     }
 
     // ===================== LOAD HISTOGRAMS =====================
@@ -503,7 +504,7 @@
 
       try {
         // Raw histogram
-        const res1 = await fetch(`/api/histogram_raw?datasetId=${DATASET_ID}`);
+        const res1 = await fetch(`/api/histogram_raw?datasetId=${DATASET_ID}&t=${Date.now()}`)
         if (res1.ok) {
           const data1 = await res1.json();
           if (data1.success) {
@@ -516,7 +517,7 @@
 
       try {
         // Normalized histogram
-        const res2 = await fetch(`/api/histogram_norm?datasetId=${DATASET_ID}`);
+        const res2 = await fetch(`/api/histogram_norm?datasetId=${DATASET_ID}&t=${Date.now()}`);
         if (res2.ok) {
           const data2 = await res2.json();
           if (data2.success) {
@@ -553,20 +554,44 @@
         reprocessBtn.disabled = true;
         showStatus(reprocessStatus, 'Renormalizing...', 'info');
 
-        const saveRes = await fetch('/accept_renorm_parameters', {
+        const saveRes = await fetch('/api/accept_renorm_parameters', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
-        });
+        })
 
         const saveData = await saveRes.json();
 
         if (!saveData.success) {
           throw new Error(saveData.error || 'Failed to save parameters');
         }
+        
+        // trigger renormalization
+        const renormRes = await fetch('/api/renormalize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ datasetId: DATASET_ID })
+        })
 
-        // Reload histograms
-        await loadHistograms();
+        const renormData = await renormRes.json();
+        if (!renormData.success) {
+            throw new Error(renormData.error || 'Renormalization failed');
+        }
+
+        // reload (with new norm) histograms
+        try {
+          await loadHistograms();
+        } 
+        catch (error) {
+          console.warn('Histograms not available:', error.message);
+        }
+
+        try {
+          await loadHeatmap();
+          console.log('Heatmap reloaded');
+        } catch (error) {
+          console.warn('Heatmap not available:', error.message);
+        }
 
         showStatus(reprocessStatus, 'Renormalization complete!', 'success');
 

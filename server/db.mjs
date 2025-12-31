@@ -67,6 +67,12 @@ const datasetSchema = mongoose.Schema({
         ring_width: { type: Number, default: 3 },
         z_threshold: { type: Number, default: 1.2 },
     },
+
+    renorm_parameters : {
+        remove_top_n: { type: Number, default: 0.0 },
+        normalization_strength: { type: Number, default: 1.0 },
+        norm_type: String
+    },
     
     images: [{
         fileId: mongoose.Schema.Types.ObjectId,
@@ -78,6 +84,8 @@ const datasetSchema = mongoose.Schema({
         histogramRawPath: String,
         histogramNormPath: String,
         csvPath: String,
+        csvPathNorm: String,
+        csvPathRenorm: String
     },
 }, {
     timestamps: true
