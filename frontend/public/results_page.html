@@ -482,7 +482,7 @@
     async function loadHeatmap() {
       console.log('Fetching heatmap...');
 
-      const response = await fetch(`/api/result_heatmap?datasetId=${DATASET_ID}&t=${Date.now()}`);
+      const response = await fetch(`/api/result_heatmap?datasetId=${DATASET_ID}`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -508,11 +508,19 @@
         if (res1.ok) {
           const data1 = await res1.json();
           if (data1.success) {
-            document.getElementById('histRaw').src = data1.histogramPath;
+            document.getElementById('histRaw').src = data1.histogramPath + '?t=' + Date.now();
+            document.getElementById('histRaw').style.display = 'block';
+          } else {
+            console.warn('Raw histogram not available:', data1.error);
+            document.getElementById('histRaw').style.display = 'none';
           }
+        } else {
+          console.warn('Raw histogram not found (404)');
+          document.getElementById('histRaw').style.display = 'none';
         }
       } catch (e) {
         console.warn('Could not load raw histogram:', e);
+        document.getElementById('histRaw').style.display = 'none';
       }
 
       try {
@@ -521,11 +529,19 @@
         if (res2.ok) {
           const data2 = await res2.json();
           if (data2.success) {
-            document.getElementById('histNorm').src = data2.histogramPath;
+            document.getElementById('histNorm').src = data2.histogramPath + '?t=' + Date.now();
+            document.getElementById('histNorm').style.display = 'block';
+          } else {
+            console.warn('Normalized histogram not available:', data2.error);
+            document.getElementById('histNorm').style.display = 'none';
           }
+        } else {
+          console.warn('Normalized histogram not found (404)');
+          document.getElementById('histNorm').style.display = 'none';
         }
       } catch (e) {
         console.warn('Could not load normalized histogram:', e);
+        document.getElementById('histNorm').style.display = 'none';
       }
     }
 
@@ -565,23 +581,23 @@
         if (!saveData.success) {
           throw new Error(saveData.error || 'Failed to save parameters');
         }
-        
+
         // trigger renormalization
         const renormRes = await fetch('/api/renormalize', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ datasetId: DATASET_ID })
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ datasetId: DATASET_ID })
         })
 
         const renormData = await renormRes.json();
         if (!renormData.success) {
-            throw new Error(renormData.error || 'Renormalization failed');
+          throw new Error(renormData.error || 'Renormalization failed');
         }
 
         // reload (with new norm) histograms
         try {
           await loadHistograms();
-        } 
+        }
         catch (error) {
           console.warn('Histograms not available:', error.message);
         }

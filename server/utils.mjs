@@ -189,6 +189,7 @@ export async function generateHistogram(datasetId, raw = true, params = {}) {
 
     const histogramFilename = raw ? 'histogram_raw.png' : 'histogram_norm.png'
     const histogramPath = `${datasetId}/${histogramFilename}`
+    const histogramPathFull = path.join(outputDir,histogramFilename)
 
     const csvFilename = raw ? 'result_raw.csv' : 'result_norm.csv'
     const csvPath = path.join(outputDir, csvFilename)
@@ -204,7 +205,7 @@ export async function generateHistogram(datasetId, raw = true, params = {}) {
             HISTOGRAM_GENERATOR,
             'histogram',
             csvPath,
-            '--output', histogramPath
+            '--output', histogramPathFull
         ]
 
         // Add optional params
@@ -273,13 +274,18 @@ export async function generateHistogram(datasetId, raw = true, params = {}) {
 export async function renormalize(datasetId, renormParams) {
     try {
         console.log(`[RENORMALIZE TEST] Called with datasetId: ${datasetId}`)
-        console.log(`[RENORMALIZE TEST] Parameters:`, renormParams)
-        
-        // Simulate some async work
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        console.log(`[RENORMALIZE TEST] Completed successfully`)
-        
+        console.log(`[RENORMALIZE TEST] ${renormParams}`)
+
+        const dataset = await Dataset.findById(datasetId)
+        if (!dataset) {
+            throw new Error(`Dataset ${datasetId} not found`)
+        }
+
+        const csvToRenormalize = dataset.results.csvPath
+
+        // 
+
+
         return {
             success: true,
             resultNormCsvPath: `${datasetId}/result_norm.csv`,
