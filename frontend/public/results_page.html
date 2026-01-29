@@ -339,6 +339,7 @@
   </div>
 
   <script>
+    let HIST_MODE = 'norm'
     // ===================== GET DATASET ID =====================
     function getDatasetId() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -438,7 +439,8 @@
       try {
         await loadHeatmap();
         hasAnyContent = true;
-      } catch (error) {
+      }
+      catch (error) {
         console.warn('Heatmap not available:', error.message);
         document.getElementById('resultImage').style.display = 'none';
         // Show a placeholder message
@@ -524,26 +526,54 @@
       }
 
       try {
-        // Normalized histogram
-        const res2 = await fetch(`/api/histogram_norm?datasetId=${DATASET_ID}&t=${Date.now()}`);
-        if (res2.ok) {
-          const data2 = await res2.json();
-          if (data2.success) {
-            document.getElementById('histNorm').src = data2.histogramPath + '?t=' + Date.now();
-            document.getElementById('histNorm').style.display = 'block';
-          } else {
-            console.warn('Normalized histogram not available:', data2.error);
-            document.getElementById('histNorm').style.display = 'none';
-          }
-        } else {
-          console.warn('Normalized histogram not found (404)');
-          document.getElementById('histNorm').style.display = 'none';
-        }
+        await loadNormSlot();
+        document.getElementById('histNorm').style.display = 'block';
       } catch (e) {
-        console.warn('Could not load normalized histogram:', e);
+        console.warn('Norm/Renorm histogram not available:', e);
         document.getElementById('histNorm').style.display = 'none';
       }
     }
+
+    async function loadNormSlot() {
+      console.log('=== loadNormSlot called ===');
+      console.log('HIST_MODE:', HIST_MODE);
+
+      const endpoint = (HIST_MODE === 'renorm')
+        ? `/api/histogram_renorm?datasetId=${DATASET_ID}&t=${Date.now()}`
+        : `/api/histogram_norm?datasetId=${DATASET_ID}&t=${Date.now()}`;
+
+      console.log('Calling endpoint:', endpoint);
+
+      const res = await fetch(endpoint);
+      if (!res.ok) throw new Error(`Histogram fetch failed: ${res.status}`);
+
+      const data = await res.json();
+      console.log('Response data:', data);
+
+      if (!data.success) throw new Error(data.error || 'Histogram unavailable');
+
+      const newSrc = data.histogramPath + '?t=' + Date.now();
+      console.log('Setting histogram src to:', newSrc);
+
+      // FORCE the browser to reload by clearing first
+      const imgElement = document.getElementById('histNorm');
+      imgElement.src = '';  // Clear first
+
+      // Small delay to ensure the clear takes effect
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Now set the new source
+      imgElement.src = newSrc;
+      console.log('imgElement.src =',newSrc)
+
+      const titleText = (HIST_MODE === 'renorm') ? 'Renormalized' : 'Normalized';
+      console.log('Setting title to:', titleText);
+      document.querySelector('#histNorm').closest('.histogram-box')
+        .querySelector('.hist-title').textContent = titleText;
+
+      console.log('=== loadNormSlot complete ===');
+    }
+
 
     // ===================== DOWNLOAD BUTTONS =====================
     document.getElementById('downloadRawBtn').addEventListener('click', () => {
@@ -555,6 +585,7 @@
     });
 
     // ===================== REPROCESS =====================
+    // In the REPROCESS button handler
     document.getElementById('reprocessBtn').addEventListener('click', async () => {
       const reprocessBtn = document.getElementById('reprocessBtn');
       const reprocessStatus = document.getElementById('reprocessStatus');
@@ -581,28 +612,63 @@
         if (!saveData.success) {
           throw new Error(saveData.error || 'Failed to save parameters');
         }
-
+        HIST_MODE = 'renorm';
         // trigger renormalization
         const renormRes = await fetch('/api/renormalize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ datasetId: DATASET_ID })
         })
+        console.log('/api/renormalize finished')
 
         const renormData = await renormRes.json();
         if (!renormData.success) {
           throw new Error(renormData.error || 'Renormalization failed');
         }
 
-        // reload (with new norm) histograms
-        try {
-          await loadHistograms();
-        }
-        catch (error) {
-          console.warn('Histograms not available:', error.message);
+        // Wait longer for files to be written to disk
+        showStatus(reprocessStatus, 'Loading updated histogram...', 'info');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        HIST_MODE = 'renorm';
+        //console.log('HIST_MODE: ',HIST_MODE, 'before loadNormSlot()')
+
+        // Retry with exponential backoff
+        let ok = false;
+        const maxRetries = 10;
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          try {
+            const delay = Math.min(1000 * Math.pow(1.5, attempt), 5000); // Max 5s delay
+            console.log(`Attempt ${attempt + 1}/${maxRetries} to load histogram (waiting ${delay}ms)...`);
+
+            await new Promise(r => setTimeout(r, delay));
+            await loadNormSlot();
+            //console.log('HIST_MODE: ',HIST_MODE, 'after loadNormSlot()')
+
+            // Verify the image actually loaded
+            const img = document.getElementById('histNorm');
+            if (img.complete && img.naturalHeight > 0) {
+              ok = true;
+              console.log('Histogram loaded successfully');
+              break;
+            } else {
+              console.warn('Image element exists but image not loaded yet');
+            }
+          } catch (e) {
+            console.warn(`Attempt ${attempt + 1} failed:`, e.message);
+            if (attempt === maxRetries - 1) {
+              console.error('All retry attempts exhausted');
+            }
+          }
         }
 
+        if (!ok) {
+          showStatus(reprocessStatus, 'Renormalized, but histogram may take a moment to appear', 'info');
+        }
+
+        // Reload heatmap
         try {
+          await new Promise(resolve => setTimeout(resolve, 1000));
           await loadHeatmap();
           console.log('Heatmap reloaded');
         } catch (error) {

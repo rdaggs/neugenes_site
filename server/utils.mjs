@@ -5,6 +5,8 @@ import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { ProcessingHandler } from './processing-handler.mjs'
 import { Dataset, ImageAttr } from './db.mjs'
+import { APP_CONFIG } from '../config.mjs'
+
 
 
 const __filename = fileURLToPath(import.meta.url)
@@ -12,8 +14,9 @@ const __dirname = path.dirname(__filename)
 
 const DATASET_PROCESSED_DIR = path.join(__dirname, '../neugenes/dataset_processed')
 const HEATMAP_GENERATOR = path.join(__dirname, '../neugenes/processing-scripts/manual-heatmap')
-const HISTOGRAM_GENERATOR = path.join(__dirname, '../neugenes/processing-scripts/generate_histogram.py')
-
+const HISTOGRAM_GENERATOR = path.join(__dirname, '../neugenes/processing-scripts/histogram_renorm.py')
+const WEIGHT_PATH = path.join(__dirname, '../neugenes/model/mcc/mask_weights.json')
+const ACRONYMN_MAP_PATH = path.join(__dirname, '../neugenes/model/mcc/acronym_map.json')
 
 const processingHandler = new ProcessingHandler({
     fastApiUrl: process.env.FASTAPI_URL || 'http://localhost:8000',
@@ -83,7 +86,7 @@ export async function Process(dataset, images, bucket = null) {
 }
 
 
-export async function generateHeatmap(datasetId) {
+export async function generateHeatmap(datasetId, renorm = false) {
     try {
 
         if (!datasetId) {
@@ -96,12 +99,17 @@ export async function generateHeatmap(datasetId) {
         }
 
         // Check if csv exists 
-        let csvPath;
-        if (dataset.results?.csvNormPath) {
+        let csvPath
+        if (renorm) {
+            console.log('using renorm csv from dataset')
+            csvPath = path.join(DATASET_PROCESSED_DIR, dataset.results.csvPathRenorm)
+        }
+        else if (dataset.results.csvPathNorm) {
             console.log('using csvNormPath from dataset')
             csvPath = path.join(DATASET_PROCESSED_DIR, dataset.results.csvNormPath)
-        } else {
-            // Fallback to default location
+        }
+
+        else {
             console.log(`fallback result used. result_norm.csv dne for ${datasetId}`)
             csvPath = path.join(DATASET_PROCESSED_DIR, datasetId, 'result_norm.csv')
         }
@@ -174,8 +182,9 @@ export async function generateHeatmap(datasetId) {
     }
 }
 
-export async function generateHistogram(datasetId, raw = true, params = {}) {
-    console.log(`Generating ${raw ? 'raw' : 'normalized'} histogram for dataset: ${datasetId}`)
+
+export async function generateHistogram(datasetId, histogramType = 'raw', params = {}) {
+    console.log(`Generating ${histogramType} histogram for dataset: ${datasetId}`)
 
     const dataset = await Dataset.findById(datasetId)
     if (!dataset) {
@@ -187,17 +196,56 @@ export async function generateHistogram(datasetId, raw = true, params = {}) {
         fs.mkdirSync(outputDir, { recursive: true })
     }
 
-    const histogramFilename = raw ? 'histogram_raw.png' : 'histogram_norm.png'
-    const histogramPath = `${datasetId}/${histogramFilename}`
-    const histogramPathFull = path.join(outputDir,histogramFilename)
+    // remove old 
+    const oldHistogramPath = path.join(outputDir, 'histogram_renorm.png')
+    if (fs.existsSync(oldHistogramPath)) {
+        fs.unlinkSync(oldHistogramPath)
+    }
 
-    const csvFilename = raw ? 'result_raw.csv' : 'result_norm.csv'
+    // Determine filenames based on histogram type
+    let histogramFilename, csvFilename, updateField;
+
+    switch (histogramType) {
+        case 'raw':
+            histogramFilename = 'histogram_raw.png'
+            csvFilename = 'result_raw.csv'
+            updateField = 'results.histogramRawPath'
+            break;
+
+        case 'norm':
+            histogramFilename = 'histogram_norm.png'
+            csvFilename = 'result_norm.csv'
+            updateField = 'results.histogramNormPath'
+            break;
+
+        case 'renorm':
+            histogramFilename = 'histogram_renorm.png'
+            csvFilename = 'result_renorm.csv'
+            updateField = 'results.histogramReNormPath'
+            break;
+
+        default:
+            throw new Error(`Invalid histogram type: ${histogramType}. Use 'raw', 'norm', or 'renorm'`)
+    }
+
+    const histogramPath = `${datasetId}/${histogramFilename}`
+    const histogramPathFull = path.join(outputDir, histogramFilename)
     const csvPath = path.join(outputDir, csvFilename)
 
     // Check if CSV exists
     if (!fs.existsSync(csvPath)) {
         console.error(`CSV not found: ${csvPath}`)
         throw new Error(`CSV file not found: ${csvPath}`)
+    }
+
+    // Delete old histogram if it exists (force regeneration)
+    if (fs.existsSync(histogramPathFull)) {
+        console.log(`Deleting existing histogram: ${histogramPathFull}`)
+        try {
+            fs.unlinkSync(histogramPathFull)
+        } catch (error) {
+            console.warn(`Could not delete old histogram: ${error.message}`)
+        }
     }
 
     return new Promise((resolve, reject) => {
@@ -209,7 +257,7 @@ export async function generateHistogram(datasetId, raw = true, params = {}) {
         ]
 
         // Add optional params
-        if (params.removeTopN) {
+        if (params.removeTopN !== undefined) {
             args.push('--remove-top-n', params.removeTopN.toString())
         }
         if (params.topNDisplay) {
@@ -221,11 +269,16 @@ export async function generateHistogram(datasetId, raw = true, params = {}) {
         if (params.exclude && params.exclude.length > 0) {
             args.push('--exclude', ...params.exclude)
         }
+        if (params.barColor) {
+            args.push('--bar-color', params.barColor)
+        }
+        if (params.title) {
+            args.push('--title', params.title)
+        }
 
         console.log(`Running: python ${args.join(' ')}`)
 
         const histogramProcess = spawn('python', args)
-
         let stdoutData = ''
         let stderrData = ''
 
@@ -246,7 +299,7 @@ export async function generateHistogram(datasetId, raw = true, params = {}) {
                 console.log(`Histogram generated successfully: ${histogramPath}`)
 
                 try {
-                    const updateField = raw ? 'results.histogramRawPath' : 'results.histogramNormPath'
+                    // Update dataset with histogram path
                     await Dataset.findByIdAndUpdate(datasetId, {
                         [updateField]: histogramPath
                     })
@@ -258,7 +311,9 @@ export async function generateHistogram(datasetId, raw = true, params = {}) {
                 resolve({
                     success: true,
                     histogramPath: histogramPath,
-                    stdout: stdoutData
+                    histogramType: histogramType,
+                    stdout: stdoutData,
+                    alreadyExists: false  // Since we deleted it before regenerating
                 })
             } else {
                 reject(new Error(`Histogram generation failed with code ${code}: ${stderrData}`))
@@ -269,27 +324,132 @@ export async function generateHistogram(datasetId, raw = true, params = {}) {
             reject(new Error(`Failed to start histogram process: ${error.message}`))
         })
     })
+    // const verifyPath = path.join(DATASET_PROCESSED_DIR, histogramPath)
+    // if (!fs.existsSync(verifyPath)) {
+    //     throw new Error(`Histogram file not created: ${verifyPath}`)
+    // }
+
+    // // Wait a bit to ensure file is fully written
+    // await new Promise(resolve => setTimeout(resolve, 500))
+
+    // console.log(`Histogram verified and ready: ${histogramPath}`)
 }
+
 
 export async function renormalize(datasetId, renormParams) {
     try {
-        console.log(`[RENORMALIZE TEST] Called with datasetId: ${datasetId}`)
-        console.log(`[RENORMALIZE TEST] Parameters:`, renormParams)
-        
-        // Simulate some async work
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        console.log(`[RENORMALIZE TEST] Completed successfully`)
-        
+        console.log(`[RENORMALIZE] Called with datasetId: ${datasetId}`)
+        const dataset = await Dataset.findById(datasetId)
+        if (!dataset) {
+            throw new Error(`Dataset ${datasetId} not found`)
+        }
+        // add stabilizingParameter
+        const renormParams = dataset.renorm_parameters
+        const stabilizingParameter = renormParams?.normalization_strength || 0.3
+
+        // Get paths
+        const outputDir = path.join(DATASET_PROCESSED_DIR, datasetId)
+        const csvToRenormalize = path.join(outputDir, 'result_raw.csv')
+        const resultRenormCsvPath = path.join(outputDir, 'result_renorm.csv')
+
+        // Validate input CSV exists
+        if (!fs.existsSync(csvToRenormalize)) {
+            throw new Error(`Normalized CSV not found: ${csvToRenormalize}`)
+        }
+
+        // Extract parameters
+
+        // Validate weights path
+        if (!WEIGHT_PATH || !fs.existsSync(WEIGHT_PATH)) {
+            throw new Error(`Weights file not found: ${WEIGHT_PATH}`)
+        }
+
+        // Build Python command
+        const args = [
+            HISTOGRAM_GENERATOR,  // path to generate_histogram.py
+            'renormalize',
+            csvToRenormalize,
+            '--weights', WEIGHT_PATH,
+            '--output', resultRenormCsvPath,
+            '--stabilizing-param', stabilizingParameter.toString()
+        ]
+
+        if (ACRONYMN_MAP_PATH && fs.existsSync(ACRONYMN_MAP_PATH)) {
+            args.push('--acronym-map', ACRONYMN_MAP_PATH)
+        }
+
+        console.log(`[RENORMALIZE] Running: python ${args.join(' ')}`)
+
+        // Execute Python script
+        const result = await new Promise((resolve, reject) => {
+            const process = spawn('python', args)
+            let stdout = ''
+            let stderr = ''
+
+            process.stdout.on('data', (data) => {
+                stdout += data.toString()
+            })
+
+            process.stderr.on('data', (data) => {
+                stderr += data.toString()
+                console.log(`[RENORMALIZE] ${data.toString().trim()}`)
+            })
+
+            process.on('close', (code) => {
+                if (code === 0) {
+                    try {
+                        const jsonResult = JSON.parse(stdout)
+                        resolve(jsonResult)
+                    } catch (error) {
+                        reject(new Error(`Failed to parse Python output: ${stdout}`))
+                    }
+                } else {
+                    reject(new Error(`Renormalization failed with code ${code}: ${stderr}`))
+                }
+            })
+
+            process.on('error', (error) => {
+                reject(new Error(`Failed to start Python process: ${error.message}`))
+            })
+        })
+
+        if (!result.success) {
+            throw new Error(`Renormalization failed: ${result.error}`)
+        }
+
+        // Update dataset with renormalized CSV path
+        const relativeCsvPath = `${datasetId}/result_renorm.csv`
+        await Dataset.findByIdAndUpdate(datasetId, {
+            'results.csvPathRenorm': relativeCsvPath,
+            'renorm_parameters.normalization_strength': renormParams.normalization_strength,
+            'renorm_parameters.norm_type': 'calibrated'
+        })
+
+        console.log(`[RENORMALIZE] Successfully updated dataset ${datasetId}`)
+
+        // Delete old renorm histogram if it exists (to force regeneration)
+        const oldHistogramPath = path.join(outputDir, 'histogram_renorm.png')
+        if (fs.existsSync(oldHistogramPath)) {
+            try {
+                fs.unlinkSync(oldHistogramPath)
+                console.log(`[RENORMALIZE] Deleted old renorm histogram`)
+            } catch (error) {
+                console.warn(`[RENORMALIZE] Could not delete old histogram: ${error.message}`)
+            }
+        }
         return {
             success: true,
-            resultNormCsvPath: `${datasetId}/result_norm.csv`,
-            message: 'Test renormalization completed'
+            resultNormCsvPath: relativeCsvPath,
+            message: 'Renormalization completed successfully',
+            stats: {
+                regionsCalibratedCount: result.regions_calibrated,
+                regionsSkipped: result.regions_skipped,
+                stabilizingParameter: result.stabilizing_parameter
+            }
         }
-    } 
-    
-    catch (error) {
-        console.error(`[RENORMALIZE TEST] Error:`, error)
+
+    } catch (error) {
+        console.error(`[RENORMALIZE] Error:`, error)
         return {
             success: false,
             error: error.message

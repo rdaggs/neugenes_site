@@ -339,7 +339,6 @@ app.post('/api/renormalize', async (req, res) => {
             })
         }
 
-
         const renormParams = dataset.renorm_parameters || {
             remove_top_n: 0.0,
             normalization_strength: 1.0,
@@ -368,16 +367,29 @@ app.post('/api/renormalize', async (req, res) => {
 
         console.log(`Renormalization complete for ${datasetId}`)
 
-        //=======================Regenerate normalized heatmap/histogram=======================//
+        //=======================Regenerate histogram FIRST=======================//
+        let histogramGenerated = false
         try {
-            await generateHistogram(datasetId, false, renormParams)
-            console.log(`Normalized histogram regenerated for ${datasetId}`)
+            console.log(`Generating renorm histogram for ${datasetId}`)
+            const histResult = await generateHistogram(datasetId, 'renorm', renormParams)
+            
+            // Verify the file actually exists
+            const histPath = path.join(DATASET_PROCESSED_DIR, histResult.histogramPath)
+            if (fs.existsSync(histPath)) {
+                histogramGenerated = true
+                console.log(`Renorm histogram verified at: ${histPath}`)
+            } else {
+                console.warn(`Histogram reported success but file not found: ${histPath}`)
+            }
         }
         catch (histError) {
-            console.warn(`Failed to regenerate histogram: ${histError.message}`)
+            console.error(`Failed to regenerate histogram: ${histError.message}`)
         }
+
+        //=======================Then regenerate heatmap=======================//
         try {
-            await generateHeatmap(datasetId)
+            console.log(`Generating heatmap for ${datasetId}`)
+            await generateHeatmap(datasetId, true)
             console.log(`Heatmap regenerated for ${datasetId}`)
         }
         catch (heatmapError) {
@@ -387,10 +399,10 @@ app.post('/api/renormalize', async (req, res) => {
         return res.json({
             success: true,
             datasetId: dataset._id,
-            message: 'Renormalization complete'
+            message: 'Renormalization complete',
+            histogramReady: histogramGenerated
         })
     }
-
     catch (error) {
         console.error('Error renormalizing dataset:', error)
         res.status(500).json({
@@ -475,21 +487,20 @@ app.post('/process_dataset', async (req, res) => {
 
                 try {
                     console.log(`Generating heatmap for dataset: ${datasetId}`)
-                    const heatmapResult = await generateHeatmap(datasetId)
+                    const heatmapResult = await generateHeatmap(datasetId, false)
                     console.log(`Heatmap generated: ${heatmapResult.heatmapPath}`)
                 }
                 catch (heatmapError) {
                     console.error(`Failed to generate heatmap for ${datasetId}:`, heatmapError.message)
                 }
 
-                // Generate histograms
+
                 try {
                     console.log(`Generating histograms for dataset: ${datasetId}`)
-                    const dataset = await Dataset.findById(datasetId)
-                    const renormParams = dataset?.parameters?.renorm || {}
 
-                    await generateHistogram(datasetId, true, {})
-                    await generateHistogram(datasetId, false, renormParams)
+                    // Generate histograms
+                    await generateHistogram(datasetId, 'raw', {})
+                    await generateHistogram(datasetId, 'norm', {})
                     console.log(`Histograms generated for ${datasetId}`)
                 }
                 catch (histogramError) {
@@ -749,6 +760,55 @@ app.get('/api/histogram_norm', async (req, res) => {
         res.status(500).json({ success: false, error: error.message })
     }
 })
+
+app.get('/api/histogram_renorm', async (req, res) => {
+    const datasetId = req.query.datasetId
+    try {
+        if (!datasetId) {
+            return res.status(400).json({ success: false, error: 'datasetId is required' })
+        }
+
+        const dataset = await Dataset.findById(datasetId)
+        if (!dataset) {
+            return res.status(404).json({ success: false, error: 'Dataset not found' })
+        }
+
+        // Check if stored path exists
+        if (dataset.results?.histogramReNormPath) {
+            const fullPath = path.join(DATASET_PROCESSED_DIR, dataset.results.histogramReNormPath)
+            if (fs.existsSync(fullPath)) {
+                return res.json({
+                    success: true,
+                    histogramPath: `/results/${dataset.results.histogramReNormPath}`,
+                    alreadyExists: true
+                })
+            }
+        }
+
+        // Fallback: check default location
+        const defaultPath = path.join(DATASET_PROCESSED_DIR, datasetId, 'histogram_renorm.png')
+        if (fs.existsSync(defaultPath)) {
+            const relativePath = `${datasetId}/histogram_renorm.png`
+            await Dataset.findByIdAndUpdate(datasetId, {
+                $set: { 'results.histogramReNormPath': relativePath }
+            })
+            return res.json({
+                success: true,
+                histogramPath: `/results/${relativePath}`
+            })
+        }
+
+        // Not ready yet
+        return res.status(404).json({
+            success: false,
+            error: 'Renormalized histogram not ready yet. Please wait for renormalization to complete.'
+        })
+    } catch (error) {
+        console.error('Error finding renormalized histogram:', error)
+        res.status(500).json({ success: false, error: error.message })
+    }
+})
+
 
 async function processAndRedirect(datasetId) {
     const spinner = document.getElementById('loading-spinner')

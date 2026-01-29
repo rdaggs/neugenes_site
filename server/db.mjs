@@ -83,9 +83,11 @@ const datasetSchema = mongoose.Schema({
         heatmapPath: String,
         histogramRawPath: String,
         histogramNormPath: String,
+        histogramReNormPath: String,
         csvPath: String,
         csvPathNorm: String,
-        csvPathRenorm: String
+        csvPathRenorm: String,
+        updateField: String,
     },
 }, {
     timestamps: true

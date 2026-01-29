@@ -1,5 +1,4 @@
 # neugenes/processing-scripts/generate_histogram.py
-#!/usr/bin/env python3
 """
 Brain Region CSV Processor and Histogram Generator
 Command-line tools for processing brain imaging data
@@ -250,6 +249,146 @@ def generate_brain_region_histogram(
             'error': str(e)
         }
 
+# ============================================================================
+# FUNCTION 3: RENORMALIZATION
+# ============================================================================
+
+def renormalize_csv(
+    input_csv_path: str,
+    output_csv_path: Optional[str] = None,
+    weights_json_path: Optional[str] = None,
+    acronym_to_id_map: Optional[dict] = None,
+    stabilizing_parameter: float = 0.3,
+    verbose: bool = True
+) -> dict:
+    """
+    Renormalize brain region CSV by applying calibration based on structure weights.
+    """
+    try:
+        # Load CSV data
+        df = pd.read_csv(input_csv_path)
+        
+        if verbose:
+            print(f"Loaded CSV: {input_csv_path}", file=sys.stderr)
+            print(f"Shape: {df.shape}", file=sys.stderr)
+        
+        # Load structure weights
+        if weights_json_path is None:
+            return {
+                'success': False,
+                'error': 'weights_json_path is required for renormalization'
+            }
+        
+        if not os.path.exists(weights_json_path):
+            return {
+                'success': False,
+                'error': f'Weights file not found: {weights_json_path}'
+            }
+        
+        with open(weights_json_path, 'r') as f:
+            structure_weights = json.load(f)
+        
+        if verbose:
+            print(f"Loaded weights from: {weights_json_path}", file=sys.stderr)
+            print(f"Number of structures in weights: {len(structure_weights)}", file=sys.stderr)
+        
+        # INVERT THE ACRONYM MAP (id -> acronym becomes acronym -> id)
+        if acronym_to_id_map:
+            # The input map is id -> acronym, so we need to flip it
+            inverted_map = {v: k for k, v in acronym_to_id_map.items()}
+            acronym_to_id_map = inverted_map
+            if verbose:
+                print(f"Inverted acronym map, sample: {list(acronym_to_id_map.items())[:5]}", file=sys.stderr)
+        
+        # Identify region columns (all except 'Filename')
+        region_columns = [col for col in df.columns if col != 'Filename']
+        
+        # Normalize the weights
+        weight_values = [float(v) for v in structure_weights.values()]
+        min_val = min(weight_values)
+        max_val = max(weight_values)
+        
+        normalized_weights = {
+            key: (float(value) - min_val) / (max_val - min_val) 
+            for key, value in structure_weights.items()
+        }
+        
+        if verbose:
+            print(f"Weight normalization range: [{min_val}, {max_val}]", file=sys.stderr)
+        
+        # Apply calibration to each region column
+        calibrated_df = df.copy()
+        calibrated_count = 0
+        skipped_count = 0
+        
+        for region in region_columns:
+            # Find the structure ID for this region
+            struct_id = None
+            
+            # Try 1: Look up via acronym map
+            if acronym_to_id_map and region in acronym_to_id_map:
+                struct_id = str(acronym_to_id_map[region])
+            
+            # Try 2: Check if region name is directly in weights
+            if struct_id is None and region in normalized_weights:
+                struct_id = region
+            
+            # Try 3: Check if region (as string) is a key when converted
+            if struct_id is None and str(region) in normalized_weights:
+                struct_id = str(region)
+            
+            if struct_id and struct_id in normalized_weights:
+                norm_weight = normalized_weights[struct_id]
+                
+                if norm_weight != 0:
+                    # Apply transformation: value / weight + stabilizing_parameter
+                    calibrated_df[region] = df[region] / norm_weight + stabilizing_parameter
+                    calibrated_count += 1
+                    if verbose and calibrated_count <= 5:  # Show first 5 matches
+                        print(f"✓ Calibrated '{region}' using struct_id '{struct_id}': weight={norm_weight:.4f}", file=sys.stderr)
+                else:
+                    # Weight is 0, keep original values
+                    if verbose:
+                        print(f"Warning: Zero weight for region '{region}', keeping original values", file=sys.stderr)
+                    skipped_count += 1
+            else:
+                # No matching weight found
+                skipped_count += 1
+                if verbose and skipped_count <= 10:  # Only show first 10 to avoid spam
+                    print(f"Warning: No weight found for region '{region}' (tried struct_id='{struct_id}')", file=sys.stderr)
+        
+        if verbose:
+            print(f"Calibrated {calibrated_count} regions", file=sys.stderr)
+            if skipped_count > 0:
+                print(f"Skipped {skipped_count} regions (no matching weights or zero weight)", file=sys.stderr)
+        
+        # Generate output path if not provided
+        if output_csv_path is None:
+            base_name = os.path.splitext(input_csv_path)[0]
+            output_csv_path = f"{base_name}_renorm.csv"
+        
+        # Save calibrated data
+        calibrated_df.to_csv(output_csv_path, index=False)
+        
+        if verbose:
+            print(f"Saved renormalized CSV: {output_csv_path}", file=sys.stderr)
+        
+        return {
+            'success': True,
+            'output_path': output_csv_path,
+            'original_shape': list(df.shape),
+            'regions_calibrated': calibrated_count,
+            'regions_skipped': skipped_count,
+            'stabilizing_parameter': stabilizing_parameter
+        }
+        
+    except Exception as e:
+        import traceback
+        return {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }
 
 # ============================================================================
 # CLI INTERFACE
@@ -305,6 +444,16 @@ Examples:
     hist_parser.add_argument('--height', type=int, default=12, help='Figure height in inches (default: 12)')
     hist_parser.add_argument('--quiet', action='store_true', help='Suppress verbose output')
     
+    # ========== RENORMALIZE COMMAND ==========
+    renorm_parser = subparsers.add_parser('renormalize', help='Renormalize CSV using structure weights')
+    renorm_parser.add_argument('input', help='Input CSV file path')
+    renorm_parser.add_argument('--weights', required=True, help='Path to weights JSON file')
+    renorm_parser.add_argument('--output', help='Output CSV file path (auto-generated if not provided)')
+    renorm_parser.add_argument('--acronym-map', help='Path to JSON file mapping acronyms to structure IDs')
+    renorm_parser.add_argument('--stabilizing-param', type=float, default=0.3, 
+                               help='Stabilizing parameter for calibration (default: 0.3)')
+    renorm_parser.add_argument('--quiet', action='store_true', help='Suppress verbose output')
+
     args = parser.parse_args()
     
     if not args.command:
@@ -338,6 +487,22 @@ Examples:
             xlabel=args.xlabel,
             figsize_width=args.width,
             figsize_height=args.height,
+            verbose=not args.quiet
+        )
+
+    elif args.command == 'renormalize':
+        # Load acronym map if provided
+        acronym_map = None
+        if args.acronym_map:
+            with open(args.acronym_map, 'r') as f:
+                acronym_map = json.load(f)
+        
+        result = renormalize_csv(
+            input_csv_path=args.input,
+            output_csv_path=args.output,
+            weights_json_path=args.weights,
+            acronym_to_id_map=acronym_map,
+            stabilizing_parameter=args.stabilizing_param,
             verbose=not args.quiet
         )
     
