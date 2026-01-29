@@ -128,7 +128,6 @@ def process_brain_regions_csv(
 def generate_brain_region_histogram(
     csv_path: str,
     output_image_path: str,
-    remove_top_n: int = 0,
     exclude_regions: Optional[List[str]] = None,
     top_n_display: int = 30,
     power_exponent: float = 3.0,
@@ -140,7 +139,12 @@ def generate_brain_region_histogram(
     figsize_height: int = 12,
     verbose: bool = True
 ) -> dict:
-    """Generate horizontal bar histogram of brain region expression."""
+    """
+    Generate horizontal bar histogram of brain region expression.
+    
+    This function visualizes whatever is in the CSV - if regions have been
+    set to 0.3 in a previous step, they will naturally appear at the bottom.
+    """
     try:
         # Load data
         df = pd.read_csv(csv_path)
@@ -157,33 +161,39 @@ def generate_brain_region_histogram(
         scaled_sums = (region_sums / region_sums.max()) * 100
         sorted_regions = scaled_sums.sort_values(ascending=False)
         
-        # Exclude specific regions
+        if verbose:
+            print(f"Total regions: {len(sorted_regions)}", file=sys.stderr)
+            print(f"Top 5 regions: {list(sorted_regions.head(5).index)}", file=sys.stderr)
+        
+        # Exclude specific regions by name (optional)
         if exclude_regions:
             valid_exclusions = [r for r in exclude_regions if r in sorted_regions.index]
             if valid_exclusions:
                 sorted_regions = sorted_regions.drop(valid_exclusions)
                 if verbose:
-                    print(f"Excluded {len(valid_exclusions)} region(s)", file=sys.stderr)
+                    print(f"Excluded {len(valid_exclusions)} region(s) by name", file=sys.stderr)
         
-        # Remove top N
-        if remove_top_n > 0:
-            if verbose:
-                print(f"Removing top {remove_top_n} regions", file=sys.stderr)
-            sorted_regions = sorted_regions.iloc[remove_top_n:]
-        
-        # Select top N for display
+        # Select top N for display (sorted ascending for horizontal bars)
         sorted_regions = sorted_regions.sort_values(ascending=True)
         top_regions = sorted_regions.tail(top_n_display)
         
+        if verbose:
+            print(f"Displaying top {top_n_display} regions", file=sys.stderr)
+            print(f"Top 5 in histogram: {list(top_regions.tail(5).index)}", file=sys.stderr)
+        
         # Apply power transformation
         if power_exponent != 1.0:
+            if verbose:
+                print(f"\nApplying power transformation to top {top_n_display} regions...", file=sys.stderr)
+                print(f"Before transformation - Min: {top_regions.min():.2f}%, Max: {top_regions.max():.2f}%", file=sys.stderr)
+            
             top_regions_transformed = np.power(top_regions, power_exponent)
             
             if apply_normalization:
                 top_regions_transformed = (top_regions_transformed / top_regions_transformed.max()) * 100
             
             if verbose:
-                print(f"Applied transformation: ^{power_exponent}", file=sys.stderr)
+                print(f"After transformation (^{power_exponent}) - Min: {top_regions_transformed.min():.2f}%, Max: {top_regions_transformed.max():.2f}%", file=sys.stderr)
         else:
             top_regions_transformed = top_regions
         
@@ -206,8 +216,6 @@ def generate_brain_region_histogram(
         
         if title is None:
             title = f'Regional Expression Levels (n={df.shape[0]})'
-            if remove_top_n > 0:
-                title += f', excluding top {remove_top_n}'
         
         ax.set_title(title, fontsize=13, fontweight='bold', pad=20)
         
@@ -249,6 +257,7 @@ def generate_brain_region_histogram(
             'error': str(e)
         }
 
+
 # ============================================================================
 # FUNCTION 3: RENORMALIZATION
 # ============================================================================
@@ -259,10 +268,14 @@ def renormalize_csv(
     weights_json_path: Optional[str] = None,
     acronym_to_id_map: Optional[dict] = None,
     stabilizing_parameter: float = 0.3,
+    remove_top_n: int = 0,
     verbose: bool = True
 ) -> dict:
     """
     Renormalize brain region CSV by applying calibration based on structure weights.
+    
+    The remove_top_n parameter will identify the top N highest-expressing regions
+    AFTER calibration and set them to stabilizing_parameter (default 0.3).
     """
     try:
         # Load CSV data
@@ -271,6 +284,9 @@ def renormalize_csv(
         if verbose:
             print(f"Loaded CSV: {input_csv_path}", file=sys.stderr)
             print(f"Shape: {df.shape}", file=sys.stderr)
+        
+        # Identify region columns (all except 'Filename')
+        region_columns = [col for col in df.columns if col != 'Filename']
         
         # Load structure weights
         if weights_json_path is None:
@@ -294,32 +310,28 @@ def renormalize_csv(
         
         # INVERT THE ACRONYM MAP (id -> acronym becomes acronym -> id)
         if acronym_to_id_map:
-            # The input map is id -> acronym, so we need to flip it
             inverted_map = {v: k for k, v in acronym_to_id_map.items()}
             acronym_to_id_map = inverted_map
             if verbose:
                 print(f"Inverted acronym map, sample: {list(acronym_to_id_map.items())[:5]}", file=sys.stderr)
         
-        # Identify region columns (all except 'Filename')
-        region_columns = [col for col in df.columns if col != 'Filename']
-        
-        # Normalize the weights
+        # Get weight values and normalize to [0,1] range
         weight_values = [float(v) for v in structure_weights.values()]
         min_val = min(weight_values)
         max_val = max(weight_values)
-        
-        normalized_weights = {
-            key: (float(value) - min_val) / (max_val - min_val) 
-            for key, value in structure_weights.items()
-        }
+        normalized_weights = {key: (float(value) - min_val) / (max_val - min_val) 
+                            for key, value in structure_weights.items()}
         
         if verbose:
-            print(f"Weight normalization range: [{min_val}, {max_val}]", file=sys.stderr)
+            print(f"Raw weight range: [{min_val:.2f}, {max_val:.2f}]", file=sys.stderr)
+            print(f"Weight statistics: mean={np.mean(weight_values):.2f}, std={np.std(weight_values):.2f}", file=sys.stderr)
         
-        # Apply calibration to each region column
+        # STEP 1: Apply calibration to ALL regions first
         calibrated_df = df.copy()
         calibrated_count = 0
         skipped_count = 0
+        
+        calibration_stats = []
         
         for region in region_columns:
             # Find the structure ID for this region
@@ -338,29 +350,135 @@ def renormalize_csv(
                 struct_id = str(region)
             
             if struct_id and struct_id in normalized_weights:
-                norm_weight = normalized_weights[struct_id]
+                w = normalized_weights[struct_id]
                 
-                if norm_weight != 0:
-                    # Apply transformation: value / weight + stabilizing_parameter
-                    calibrated_df[region] = df[region] / norm_weight + stabilizing_parameter
+                # Apply the transformation
+                if w != 0:
+                    calibrated_df[region] = df[region] / w + stabilizing_parameter
                     calibrated_count += 1
-                    if verbose and calibrated_count <= 5:  # Show first 5 matches
-                        print(f"✓ Calibrated '{region}' using struct_id '{struct_id}': weight={norm_weight:.4f}", file=sys.stderr)
+                    
+                    # Store stats for first few regions
+                    if calibrated_count <= 5:
+                        sample_old = df[region].iloc[0] if len(df) > 0 else 0
+                        sample_new = calibrated_df[region].iloc[0] if len(df) > 0 else 0
+                        calibration_stats.append({
+                            'region': region,
+                            'normalized_weight': w,
+                            'sample_old': sample_old,
+                            'sample_new': sample_new
+                        })
+                    
+                    if verbose and calibrated_count <= 10:
+                        sample_old = df[region].iloc[0] if len(df) > 0 else 0
+                        sample_new = calibrated_df[region].iloc[0] if len(df) > 0 else 0
+                        print(f"✓ '{region}': norm_weight={w:.4f}, "
+                              f"sample: {sample_old:.1f} → {sample_new:.1f}", file=sys.stderr)
                 else:
-                    # Weight is 0, keep original values
-                    if verbose:
-                        print(f"Warning: Zero weight for region '{region}', keeping original values", file=sys.stderr)
+                    # If weight is 0, skip calibration for this region
                     skipped_count += 1
             else:
-                # No matching weight found
+                # No matching weight found - keep original values
                 skipped_count += 1
-                if verbose and skipped_count <= 10:  # Only show first 10 to avoid spam
-                    print(f"Warning: No weight found for region '{region}' (tried struct_id='{struct_id}')", file=sys.stderr)
+                if verbose and skipped_count <= 5:
+                    print(f"⚠ No weight for '{region}' - keeping original values", file=sys.stderr)
+        
+        # STEP 2: NOW identify top N from calibrated data
+        regions_to_zero = []
+        zeroed_count = 0
+        
+        if remove_top_n > 0:
+            # Calculate total signal per region in CALIBRATED data
+            region_sums_calibrated = calibrated_df[region_columns].sum()
+            # Sort descending to get highest first
+            sorted_by_sum = region_sums_calibrated.sort_values(ascending=False)
+            # Take top N
+            regions_to_zero = sorted_by_sum.head(remove_top_n).index.tolist()
+            
+            if verbose:
+                print(f"\n{'='*60}", file=sys.stderr)
+                print(f"TOP {remove_top_n} REGIONS TO SET TO {stabilizing_parameter} (POST-CALIBRATION):", file=sys.stderr)
+                for i, region in enumerate(regions_to_zero, 1):
+                    print(f"  {i}. {region}: calibrated_sum={region_sums_calibrated[region]:.1f}", file=sys.stderr)
+                print(f"{'='*60}\n", file=sys.stderr)
+            
+            # Set them to low value
+            for region in regions_to_zero:
+                calibrated_df[region] = stabilizing_parameter
+                zeroed_count += 1
         
         if verbose:
-            print(f"Calibrated {calibrated_count} regions", file=sys.stderr)
-            if skipped_count > 0:
-                print(f"Skipped {skipped_count} regions (no matching weights or zero weight)", file=sys.stderr)
+            print(f"\n{'='*70}", file=sys.stderr)
+            print(f"RENORMALIZATION COMPLETE - DETAILED REPORT", file=sys.stderr)
+            print(f"{'='*70}", file=sys.stderr)
+            
+            # Summary stats
+            print(f"\nSUMMARY:", file=sys.stderr)
+            print(f"  Total regions in CSV: {len(region_columns)}", file=sys.stderr)
+            print(f"  Regions CALIBRATED (weight-scaled): {calibrated_count}", file=sys.stderr)
+            print(f"  Regions SET TO {stabilizing_parameter} (top {remove_top_n} post-calibration): {zeroed_count}", file=sys.stderr)
+            print(f"  Regions SKIPPED (no weight match): {skipped_count}", file=sys.stderr)
+            
+            # List of zeroed regions
+            if regions_to_zero:
+                print(f"\n{'─'*70}", file=sys.stderr)
+                print(f"REGIONS SET TO {stabilizing_parameter} (AFTER CALIBRATION):", file=sys.stderr)
+                print(f"{'─'*70}", file=sys.stderr)
+                for i, region in enumerate(regions_to_zero, 1):
+                    original_sum = df[region].sum()
+                    calibrated_before_zero = (df[region] / normalized_weights.get(str(acronym_to_id_map.get(region, region)), 1) + stabilizing_parameter).sum() if region not in [r for r in region_columns if r not in calibrated_df.columns or calibrated_df[region].sum() == stabilizing_parameter * len(df)] else 0
+                    new_sum = calibrated_df[region].sum()
+                    print(f"  {i:2d}. {region:20s} (original: {original_sum:>10.1f} → post-calib: {region_sums_calibrated[region]:>10.1f} → final: {new_sum:>10.1f})", file=sys.stderr)
+            
+            # Show what the FINAL top regions are after all processing
+            print(f"\n{'─'*70}", file=sys.stderr)
+            print(f"FINAL TOP 30 REGIONS AFTER ALL PROCESSING:", file=sys.stderr)
+            print(f"{'─'*70}", file=sys.stderr)
+            
+            # Calculate sums in the FINAL data
+            final_region_sums = calibrated_df[region_columns].sum()
+            final_sorted = final_region_sums.sort_values(ascending=False)
+            
+            for i, (region, value) in enumerate(final_sorted.head(30).items(), 1):
+                original_value = df[region].sum()
+                change = value - original_value
+                change_pct = (change / max(original_value, 0.01)) * 100
+                
+                # Mark if this was in the zeroed list
+                marker = "🚫" if region in regions_to_zero else "✓"
+                
+                print(f"  {i:2d}. {marker} {region:20s} old: {original_value:>8.1f} → final: {value:>8.1f} "
+                    f"({change_pct:>+7.1f}%)", file=sys.stderr)
+            
+            # Calibration examples (non-zeroed regions that were scaled)
+            if calibration_stats:
+                print(f"\n{'─'*70}", file=sys.stderr)
+                print(f"CALIBRATION EXAMPLES (weight-scaled regions):", file=sys.stderr)
+                print(f"{'─'*70}", file=sys.stderr)
+                for stat in calibration_stats[:10]:
+                    change_pct = ((stat['sample_new'] - stat['sample_old']) / max(stat['sample_old'], 0.01)) * 100
+                    print(f"  {stat['region']:20s} norm_weight: {stat['normalized_weight']:>6.4f} "
+                        f"sample: {stat['sample_old']:>7.1f} → {stat['sample_new']:>7.1f} "
+                        f"({change_pct:>+6.0f}%)", file=sys.stderr)
+            
+            # Final statistics comparison
+            print(f"\n{'─'*70}", file=sys.stderr)
+            print(f"BEFORE/AFTER STATISTICS:", file=sys.stderr)
+            print(f"{'─'*70}", file=sys.stderr)
+            
+            original_total = df[region_columns].sum().sum()
+            calibrated_total = calibrated_df[region_columns].sum().sum()
+            
+            original_max = df[region_columns].sum().max()
+            calibrated_max = calibrated_df[region_columns].sum().max()
+            
+            original_mean = df[region_columns].sum().mean()
+            calibrated_mean = calibrated_df[region_columns].sum().mean()
+            
+            print(f"  Total signal:     {original_total:>12.1f} → {calibrated_total:>12.1f}", file=sys.stderr)
+            print(f"  Max region:       {original_max:>12.1f} → {calibrated_max:>12.1f}", file=sys.stderr)
+            print(f"  Mean per region:  {original_mean:>12.1f} → {calibrated_mean:>12.1f}", file=sys.stderr)
+            
+            print(f"\n{'='*70}\n", file=sys.stderr)
         
         # Generate output path if not provided
         if output_csv_path is None:
@@ -378,8 +496,10 @@ def renormalize_csv(
             'output_path': output_csv_path,
             'original_shape': list(df.shape),
             'regions_calibrated': calibrated_count,
+            'regions_set_to_baseline': zeroed_count,
             'regions_skipped': skipped_count,
-            'stabilizing_parameter': stabilizing_parameter
+            'stabilizing_parameter': stabilizing_parameter,
+            'baseline_regions': regions_to_zero
         }
         
     except Exception as e:
@@ -389,6 +509,7 @@ def renormalize_csv(
             'error': str(e),
             'traceback': traceback.format_exc()
         }
+
 
 # ============================================================================
 # CLI INTERFACE
@@ -406,10 +527,13 @@ Examples:
   # Process CSV - remove regions
   python %(prog)s process input.csv --remove IAD AV CP
   
-  # Generate histogram
-  python %(prog)s histogram input.csv --output histogram.png --remove-top-n 2 --top-n-display 30
+  # Renormalize CSV (sets top 3 regions to 0.3, applies weights to others)
+  python %(prog)s renormalize input.csv --weights weights.json --remove-top-n 3 --output result_renorm.csv
   
-  # Generate histogram with exclusions
+  # Generate histogram (visualizes whatever is in the CSV)
+  python %(prog)s histogram result_renorm.csv --output histogram_renorm.png --top-n-display 30
+  
+  # Generate histogram with manual exclusions
   python %(prog)s histogram input.csv --output hist.png --exclude IAD AV --power 2.5
         """
     )
@@ -432,8 +556,7 @@ Examples:
     hist_parser = subparsers.add_parser('histogram', help='Generate histogram visualization')
     hist_parser.add_argument('input', help='Input CSV file path')
     hist_parser.add_argument('--output', required=True, help='Output image file path')
-    hist_parser.add_argument('--remove-top-n', type=int, default=0, help='Remove top N regions (default: 0)')
-    hist_parser.add_argument('--exclude', nargs='+', help='Specific regions to exclude')
+    hist_parser.add_argument('--exclude', nargs='+', help='Specific regions to exclude from visualization')
     hist_parser.add_argument('--top-n-display', type=int, default=30, help='Number of regions to display (default: 30)')
     hist_parser.add_argument('--power', type=float, default=3.0, help='Power transformation exponent (default: 3.0)')
     hist_parser.add_argument('--no-normalize', action='store_true', help='Skip normalization after transformation')
@@ -452,6 +575,8 @@ Examples:
     renorm_parser.add_argument('--acronym-map', help='Path to JSON file mapping acronyms to structure IDs')
     renorm_parser.add_argument('--stabilizing-param', type=float, default=0.3, 
                                help='Stabilizing parameter for calibration (default: 0.3)')
+    renorm_parser.add_argument('--remove-top-n', type=int, default=0,
+                          help='Set top N regions to stabilizing parameter (default: 0)')
     renorm_parser.add_argument('--quiet', action='store_true', help='Suppress verbose output')
 
     args = parser.parse_args()
@@ -477,7 +602,6 @@ Examples:
         result = generate_brain_region_histogram(
             csv_path=args.input,
             output_image_path=args.output,
-            remove_top_n=args.remove_top_n,
             exclude_regions=args.exclude,
             top_n_display=args.top_n_display,
             power_exponent=args.power,
@@ -503,6 +627,7 @@ Examples:
             weights_json_path=args.weights,
             acronym_to_id_map=acronym_map,
             stabilizing_parameter=args.stabilizing_param,
+            remove_top_n=args.remove_top_n,
             verbose=not args.quiet
         )
     

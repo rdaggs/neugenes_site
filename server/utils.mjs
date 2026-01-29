@@ -257,9 +257,8 @@ export async function generateHistogram(datasetId, histogramType = 'raw', params
         ]
 
         // Add optional params
-        if (params.removeTopN !== undefined) {
-            args.push('--remove-top-n', params.removeTopN.toString())
-        }
+        // NOTE: We do NOT add --remove-top-n here for renorm histograms
+        // because the CSV has already been renormalized with top regions set to 0.3
         if (params.topNDisplay) {
             args.push('--top-n-display', params.topNDisplay.toString())
         }
@@ -324,17 +323,7 @@ export async function generateHistogram(datasetId, histogramType = 'raw', params
             reject(new Error(`Failed to start histogram process: ${error.message}`))
         })
     })
-    // const verifyPath = path.join(DATASET_PROCESSED_DIR, histogramPath)
-    // if (!fs.existsSync(verifyPath)) {
-    //     throw new Error(`Histogram file not created: ${verifyPath}`)
-    // }
-
-    // // Wait a bit to ensure file is fully written
-    // await new Promise(resolve => setTimeout(resolve, 500))
-
-    // console.log(`Histogram verified and ready: ${histogramPath}`)
 }
-
 
 export async function renormalize(datasetId, renormParams) {
     try {
@@ -343,9 +332,13 @@ export async function renormalize(datasetId, renormParams) {
         if (!dataset) {
             throw new Error(`Dataset ${datasetId} not found`)
         }
-        // add stabilizingParameter
-        const renormParams = dataset.renorm_parameters
-        const stabilizingParameter = renormParams?.normalization_strength || 0.3
+        
+        // Get renormalization parameters from dataset
+        const datasetRenormParams = dataset.renorm_parameters || {}
+        const stabilizingParameter = datasetRenormParams.normalization_strength || 0.3
+        const removeTopN = datasetRenormParams.remove_top_n || 0
+
+        console.log(`[RENORMALIZE] Parameters: stabilizing=${stabilizingParameter}, removeTopN=${removeTopN}`)
 
         // Get paths
         const outputDir = path.join(DATASET_PROCESSED_DIR, datasetId)
@@ -354,10 +347,8 @@ export async function renormalize(datasetId, renormParams) {
 
         // Validate input CSV exists
         if (!fs.existsSync(csvToRenormalize)) {
-            throw new Error(`Normalized CSV not found: ${csvToRenormalize}`)
+            throw new Error(`Raw CSV not found: ${csvToRenormalize}`)
         }
-
-        // Extract parameters
 
         // Validate weights path
         if (!WEIGHT_PATH || !fs.existsSync(WEIGHT_PATH)) {
@@ -371,7 +362,8 @@ export async function renormalize(datasetId, renormParams) {
             csvToRenormalize,
             '--weights', WEIGHT_PATH,
             '--output', resultRenormCsvPath,
-            '--stabilizing-param', stabilizingParameter.toString()
+            '--stabilizing-param', stabilizingParameter.toString(),
+            '--remove-top-n', removeTopN.toString()  // This sets top N regions to 0.3 in the CSV
         ]
 
         if (ACRONYMN_MAP_PATH && fs.existsSync(ACRONYMN_MAP_PATH)) {
@@ -421,7 +413,8 @@ export async function renormalize(datasetId, renormParams) {
         const relativeCsvPath = `${datasetId}/result_renorm.csv`
         await Dataset.findByIdAndUpdate(datasetId, {
             'results.csvPathRenorm': relativeCsvPath,
-            'renorm_parameters.normalization_strength': renormParams.normalization_strength,
+            'renorm_parameters.normalization_strength': stabilizingParameter,
+            'renorm_parameters.remove_top_n': removeTopN,
             'renorm_parameters.norm_type': 'calibrated'
         })
 
@@ -437,14 +430,17 @@ export async function renormalize(datasetId, renormParams) {
                 console.warn(`[RENORMALIZE] Could not delete old histogram: ${error.message}`)
             }
         }
+        
         return {
             success: true,
             resultNormCsvPath: relativeCsvPath,
             message: 'Renormalization completed successfully',
             stats: {
+                regionsSetToBaseline: result.regions_set_to_baseline,
                 regionsCalibratedCount: result.regions_calibrated,
                 regionsSkipped: result.regions_skipped,
-                stabilizingParameter: result.stabilizing_parameter
+                stabilizingParameter: result.stabilizing_parameter,
+                baselineRegions: result.baseline_regions
             }
         }
 
