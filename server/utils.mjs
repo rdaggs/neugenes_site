@@ -120,7 +120,7 @@ export async function generateHeatmap(datasetId, renorm = false) {
             const outputPath = path.join(DATASET_PROCESSED_DIR, datasetId, 'result_norm.png')
             const heatmapProcess = spawn('python', [
                 path.join(HEATMAP_GENERATOR, 'generate_heatmap_per_dataset.py'),
-                path.join(DATASET_PROCESSED_DIR, 'result_norm.csv'),
+                csvPath,
                 '--output', outputPath
             ])
 

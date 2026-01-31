@@ -6,8 +6,8 @@ import os
 
 
 def plot_group_heatmaps(data_dict, min_val, max_val, title_prefix, save_path, cmap):
-    fig, axs = plt.subplots(6, 4, figsize=(18, 12))
-    positions = range(0, 12000, 500)
+    fig, axs = plt.subplots(4, 4, figsize=(18, 12))
+    positions = range(3000, 9000, 500)
     scenes = []
 
 

@@ -811,7 +811,7 @@
         ring_width: parseInt(document.getElementById('ringWidth').value),
         z_threshold: parseFloat(document.getElementById('zThreshold').value)
       };
-      console.log('payload', payload)
+      // console.log('structure_acronymns:',structure_acronymns)
 
       // send parameters in JSON body to backend
       const res = await fetch('/accept_dataset_parameters', {

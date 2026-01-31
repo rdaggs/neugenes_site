@@ -5,8 +5,6 @@ export const APP_CONFIG = {
 
 }
 
-
-
 export const STRUCTURE_ID_TO_ACRONYM = {
     "12": "IF",
     "15": "PT",

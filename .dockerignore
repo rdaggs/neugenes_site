@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+__pycache__
+**/__pycache__
+*.pyc
+.git
+.DS_Store
+
+# datasets & generated artifacts you don't want baked into the image
+neugenes/dataset_processed
+neugenes/uploads
+temp_processing
+
+# notebooks
+*.ipynb

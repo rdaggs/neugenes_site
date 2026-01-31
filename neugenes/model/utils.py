@@ -79,9 +79,7 @@ def acronymn_to_id(structures_ac):
         for acronym in structures_ac:
             if acronym in ac_to_id:
                 id_list.append(validate_id(ac_to_id[acronym]))
-            else:
-                print(f"Functionality for structure corresponding to acronym '{acronym}' is either not supported or not found in the dictionary. Skipping.")
-        
+           
         return id_list
     
     # singular structure 
@@ -89,7 +87,7 @@ def acronymn_to_id(structures_ac):
         if structures_ac in ac_to_id:
             return validate_id(ac_to_id[structures_ac])
         else:
-            print(f"Functionality for structure corresponding to acronym '{structures_ac}' is either not supported or not found in the dictionary. Skipping.")
+            #(f"Functionality for structure corresponding to acronym '{structures_ac}' is either not supported or not found in the dictionary. Skipping.")
             return None
 
     else:
@@ -827,9 +825,7 @@ def gen_mask(structure_id):
     # alternate routing for masking
     mask_writer = functools.partial(ReferenceSpace.check_and_write, '/Users/riley/Desktop/NeuGenes/Models/model/mcc/annotation/ccf_2017/structure_masks/resolution_25')
     mask_generator = config.reference_space.many_structure_masks([structure_id], mask_writer)
-        
-    for m in mask_generator:
-        print('downloaded')
+
 
 def display_structure_3d(id):
     """ 
