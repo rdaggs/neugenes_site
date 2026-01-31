@@ -167,6 +167,7 @@ __pycache__/
 *.class
 *.so
 .Python
+*.ipynb
 
 # Virtual environments
 venv/
