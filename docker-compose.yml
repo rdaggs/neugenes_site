@@ -1,0 +1,75 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: neugenes_mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "mongodb://localhost:27017/admin", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.fastapi
+    container_name: neugenes_api
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      MONGO_URI: mongodb://mongo:27017/neugenes
+      PORT: "8000"
+      # Optional: if your code needs to know where uploads live
+      UPLOAD_DIR: /app/server/uploads
+    ports:
+      - "8000:8000"
+    volumes:
+      # FastAPI needs access to the same uploaded files as Express
+      - ./server/uploads:/app/server/uploads
+      # Persist scratch + outputs
+      - ./temp_processing:/app/temp_processing
+      - ./neugenes/dataset_processed:/app/neugenes/dataset_processed
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: neugenes_web
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    environment:
+      PORT: "3000"
+      MONGO_URI: mongodb://mongo:27017/neugenes
+      FASTAPI_URL: http://api:8000
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    volumes:
+      # Express writes multer temp files here; keep them persistent
+      - ./server/uploads:/app/server/uploads
+      # Same output dirs as above so Express can serve results reliably
+      - ./temp_processing:/app/temp_processing
+      - ./neugenes/dataset_processed:/app/neugenes/dataset_processed
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/config >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  mongo_data:
