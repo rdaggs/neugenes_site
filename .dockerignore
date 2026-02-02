@@ -6,10 +6,35 @@ __pycache__
 .git
 .DS_Store
 
+# Virtual environments
+.venv
+.neugenes-site-venv
+**/.venv
+venv
+env
+
 # datasets & generated artifacts you don't want baked into the image
 neugenes/dataset_processed
 neugenes/uploads
 temp_processing
+server/uploads
 
-# notebooks
+# notebooks and large files
 *.ipynb
+get-pip.py
+*.zip
+
+# Database and models
+*.db
+*.sqlite
+*.h5
+*.pt
+*.pth
+*.pkl
+*.model
+
+# Logs and caches
+*.log
+.cache
+.wandb
+wandb

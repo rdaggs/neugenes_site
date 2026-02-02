@@ -27,7 +27,6 @@ blinker==1.8.2
 blosc2==2.6.0
 bokeh==3.6.1
 boto3==1.34.76
-botocore==1.34.76
 Brotli==1.1.0
 cachetools==5.3.1
 catboost==1.2.2
@@ -68,8 +67,6 @@ gensim==4.3.3
 gitdb==4.0.11
 GitPython==3.1.40
 Glymur==0.12.9.post2
-google-auth==2.22.0
-google-auth-oauthlib==1.0.0
 google-pasta==0.2.0
 googleapis-common-protos==1.60.0
 graphviz==0.20.1
@@ -77,7 +74,6 @@ grpcio==1.57.0
 h11==0.14.0
 h5py==3.9.0
 hdmf==3.13.0
-huggingface-hub==0.19.4
 idna==3.4
 imageio==2.31.1
 imageio-ffmpeg==0.4.9
@@ -191,8 +187,6 @@ pyasn1==0.5.0
 pyasn1-modules==0.3.0
 pycparser==2.21
 pycryptodomex==3.22.0
-pydantic==2.9.2
-pydantic_core==2.23.4
 pydicom==2.4.3
 Pygments==2.15.1
 pynrrd==1.0.0
@@ -255,9 +249,7 @@ tensorflow==2.14.0
 tensorflow-datasets==4.9.3
 tensorflow-estimator==2.14.0
 tensorflow-io-gcs-filesystem==0.34.0
-tensorflow-macos==2.14.0
 tensorflow-metadata==1.14.0
-tensorflow-probability==0.22.0
 termcolor==2.3.0
 terminado==0.17.1
 text-unidecode==1.3
@@ -275,7 +267,7 @@ traitlets==5.9.0
 transformers==4.35.2
 typeguard==2.13.3
 types-python-dateutil==2.8.19.14
-typing_extensions==4.10.0
+typing_extensions
 tzdata==2023.3
 uri-template==1.3.0
 urllib3==2.4.0
